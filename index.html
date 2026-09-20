@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Κομμωτήρια Ελλάδας - Χάρτης Ευκαιριών & Ανταγωνισμού</title>
+    <title>Κομμωτήρια Ελλάδας</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,9 +11,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f1f5f9; color: #0f172a; }
+        html { -webkit-text-size-adjust: 100%; }
+        body { font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f1f5f9; color: #0f172a; overflow-x: clip; -webkit-tap-highlight-color: transparent; }
         .header h1, .panel-header h3, #tableBtn, .metric-btn, .popup-title, .legend-title, .ft-header h2 { font-family: 'Montserrat', 'Roboto', 'Segoe UI', sans-serif; }
-        #map { height: 100vh; width: 100%; z-index: 1; }
+        #map { height: 100vh; height: 100dvh; width: 100%; z-index: 1; }
         
         .header {
             position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
@@ -52,14 +53,18 @@
         .draggable-panel.collapsed .panel-body { display: none; }
         .panel-header { touch-action: none; }
         @media (max-width: 640px) {
-            .header { padding: 10px 14px; }
-            .header h1 { font-size: 14px; }
-            .header .subtitle { font-size: 9px; }
-            .stats-panel { top: 64px; left: 8px; right: 8px; width: auto; max-height: 48vh; }
-            .stats-panel .panel-body { max-height: calc(48vh - 52px); }
-            .stat-card { padding: 10px; }
-            .stat-card .value { font-size: 17px; }
+            .header { padding: 8px 12px; gap: 8px; }
+            .header h1 { font-size: 13px; }
+            .header .subtitle { display: none; }
+            #panelStats { top: 60px; left: 8px; right: auto; width: auto; max-width: calc(100vw - 16px); max-height: 50vh; }
+            #panelStats:not(.collapsed) { left: 8px; right: 8px; }
+            #panelStats .panel-body { max-height: calc(50vh - 52px); }
+            #panelStats .stat-card { padding: 10px; }
+            #panelStats .stat-card .value { font-size: 17px; }
+            .collapse-btn { width: 28px; height: 28px; border-radius: 8px; }
             .leaflet-control-layers { font-size: 12px; }
+            #map .leaflet-top.leaflet-right { top: 56px; }
+            .leaflet-bar a { width: 34px !important; height: 34px !important; line-height: 34px !important; font-size: 18px !important; }
         }
         .map-label-num { font-size: 0.85em; color: #0284c7; font-weight: 700; }
         .nomos-tip {
@@ -93,7 +98,7 @@
         .ft-actions button { background: #f8fafc; border: 1px solid #0ea5e9; color: #0f172a; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; }
         .ft-actions button:hover { background: rgba(14,165,233,0.12); }
         .ft-sub { padding: 8px 18px; font-size: 10px; color: #64748b; border-bottom: 1px solid #f1f5f9; }
-        .ft-scroll { overflow: auto; max-height: calc(90vh - 160px); }
+        .ft-scroll { overflow: auto; max-height: calc(90vh - 160px); -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
         #fullTable { width: 100%; border-collapse: collapse; font-size: 12px; }
         #fullTable th { position: sticky; top: 0; background: #f1f5f9; color: #475569; padding: 8px 10px; text-align: right; border-bottom: 2px solid #0ea5e9; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
         #fullTable td { padding: 7px 10px; text-align: right; border-bottom: 1px solid #e2e8f0; color: #0f172a; }
@@ -176,6 +181,15 @@
             backdrop-filter: blur(8px);
         }
         .leaflet-popup-content { margin: 14px 16px !important; line-height: 1.45 !important; }
+        .popup-title { padding-right: 34px; }
+        .leaflet-popup-close-button {
+            width: 38px !important; height: 38px !important; line-height: 38px !important;
+            font-size: 24px !important; font-weight: 400 !important;
+            top: 4px !important; right: 4px !important; padding: 0 !important;
+            color: #075985 !important; border-radius: 12px !important;
+            background: rgba(255,255,255,0.75) !important;
+        }
+        .leaflet-popup-close-button:hover { background: rgba(14,165,233,0.18) !important; color: #0284c7 !important; }
         .leaflet-popup-tip { background: rgba(255,255,255,0.98) !important; border: 1px solid rgba(14,165,233,0.35) !important; }
         .popup-title { font-size: 15px; font-weight: 800; color: #075985; margin-bottom: 8px; border-bottom: 2px solid transparent; border-image: linear-gradient(90deg, #0ea5e9, transparent) 1; padding-bottom: 8px; }
         .popup-title .city-badge { display: inline-block; background: rgba(14,165,233,0.12); border: 1px solid #0ea5e9; border-radius: 6px; padding: 2px 8px; font-size: 9px; color: #0284c7; margin-left: 6px; vertical-align: middle; }
@@ -268,6 +282,7 @@
         }
         .leaflet-bar a:hover { background: rgba(14,165,233,0.12) !important; }
         .leaflet-bar { border: 1px solid rgba(14,165,233,0.35) !important; border-radius: 10px !important; overflow: hidden; box-shadow: 0 4px 16px rgba(2,132,199,0.18) !important; }
+        .leaflet-top.leaflet-right { top: 76px; }
         .leaflet-control-layers {
             border: 1px solid rgba(14,165,233,0.35) !important; border-radius: 12px !important;
             box-shadow: 0 4px 16px rgba(2,132,199,0.18) !important; font-family: 'Roboto', sans-serif !important;
@@ -278,10 +293,13 @@
         .header { animation-name: headerDown; }
         @keyframes headerDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
+        @media (max-width: 900px) and (min-width: 641px) {
+            .metric-switch { top: auto; bottom: 20px; }
+        }
         @media (max-width: 640px) {
-            .metric-switch { top: 70px; max-width: calc(100vw - 16px); overflow-x: auto; }
-            .metric-btn { padding: 6px 10px; font-size: 10px; }
-            .metric-tip { position: fixed; top: 114px; left: 8px; right: 8px; width: auto; transform: none; }
+            .metric-switch { top: 114px; left: 8px; right: 8px; transform: none; justify-content: flex-start; overflow-x: auto; animation: none; }
+            .metric-btn { padding: 8px 12px; font-size: 10.5px; flex: 1 0 auto; }
+            .metric-tip { position: fixed; top: 160px; left: 8px; right: 8px; width: auto; transform: none; }
             .legend-card { left: 8px; bottom: 58px; padding: 8px 10px; min-width: 0; }
             .legend-card .legend-hint { display: none; }
         }
