@@ -114,7 +114,7 @@
         .legend-item { display: flex; align-items: center; margin: 6px 0; font-size: 11px; color: #334155; }
         .legend-dot { width: 14px; height: 14px; border-radius: 50%; margin-right: 8px; border: 2px solid rgba(255,255,255,0.9); box-shadow: 0 1px 6px rgba(15,23,42,0.35); flex-shrink: 0; }
         
-        .stats-panel { top: 64px; right: 16px; width: 290px; max-height: calc(100vh - 84px); display: flex; flex-direction: column; }
+        .stats-panel { top: 64px; left: 16px; width: 290px; max-height: calc(100vh - 84px); display: flex; flex-direction: column; }
         .stat-card {
             background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
             border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin-bottom: 8px;
@@ -206,12 +206,12 @@
     <button id="tableBtn" onclick="toggleFullTable()">📋 Πίνακας</button>
 </div>
 
-<div class="draggable-panel stats-panel" id="panelStats">
+<div class="draggable-panel stats-panel collapsed" id="panelStats">
     <div class="panel-header" onpointerdown="startDrag(event, 'panelStats')">
         <h3>Συνολικά Στοιχεία</h3>
         <span style="display:flex;gap:8px;align-items:center;">
             <span class="drag-hint">⠿ σύρε</span>
-            <button class="collapse-btn" onclick="toggleCollapse(event, 'panelStats', this)" onpointerdown="event.stopPropagation()" title="Ελαχιστοποίηση">−</button>
+            <button class="collapse-btn" onclick="toggleCollapse(event, 'panelStats', this)" onpointerdown="event.stopPropagation()" title="Μεγιστοποίηση">+</button>
         </span>
     </div>
     <div class="panel-body">
