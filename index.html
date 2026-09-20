@@ -182,10 +182,10 @@
         .popup-comp-bar { height: 6px; border-radius: 3px; background: #e2e8f0; margin: 3px 0; overflow: hidden; }
         .popup-comp-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
         .popup-comp-label { font-size: 9px; color: #64748b; display: flex; justify-content: space-between; margin-bottom: 1px; }
-        .popup-purch { margin-top: 8px; padding: 8px; border-radius: 8px; font-size: 12px; font-weight: 800; text-align: center; letter-spacing: 0.5px; }
-        .popup-purch.high { background: rgba(21,128,61,0.1); color: #15803d; border: 2px solid rgba(21,128,61,0.3); }
-        .popup-purch.mid { background: rgba(180,83,9,0.1); color: #b45309; border: 2px solid rgba(180,83,9,0.3); }
-        .popup-purch.low { background: rgba(220,38,38,0.08); color: #dc2626; border: 2px solid rgba(220,38,38,0.3); }
+        .popup-purch { margin-top: 8px; padding: 5px 8px; border-radius: 8px; font-size: 10.5px; font-weight: 800; text-align: center; letter-spacing: 0.5px; color: #fff; }
+        .popup-purch.high { background: #15803d; border: 1px solid #166534; }
+        .popup-purch.mid { background: #d97706; border: 1px solid #b45309; }
+        .popup-purch.low { background: #dc2626; border: 1px solid #b91c1c; }
         .purch-high { color: #15803d; font-weight: 700; }
         .purch-mid { color: #b45309; font-weight: 700; }
         .purch-low { color: #dc2626; font-weight: 700; }
@@ -1217,6 +1217,18 @@ const NOMOS_STYLE = { fillColor: '#0ea5e9', fillOpacity: 0.28, color: '#0284c7',
 const NOMOS_HOVER = { fillColor: '#0ea5e9', fillOpacity: 0.55, color: '#0369a1', weight: 3, opacity: 1 };
 const NOMOS_SELECTED = { fillColor: '#0284c7', fillOpacity: 0.6, color: '#075985', weight: 3, opacity: 1 };
 
+// Popup: περιορισμένο ύψος με scroll + autopan που σέβεται το fixed header,
+// ώστε να μη βγαίνει εκτός οθόνης και να μη κρύβεται η περιγραφή
+function popupOpts() {
+    return {
+        maxWidth: Math.min(380, (window.innerWidth || 400) - 40),
+        maxHeight: Math.round((window.innerHeight || 600) * 0.6),
+        keepInView: true,
+        autoPanPaddingTopLeft: L.point(20, 90),
+        autoPanPaddingBottomRight: L.point(30, 40)
+    };
+}
+
 function applyNomosStyle(name, style) {
     (nomosLayersByName[name] || []).forEach(l => l.setStyle(style));
 }
@@ -1243,7 +1255,7 @@ regions.filter(r => r.is_city).forEach(r => {
         weight: 3, opacity: 0.95, fillOpacity: 0.9
     }).addTo(map);
 
-    marker.bindPopup(buildPopupContent(r), { maxWidth: Math.min(380, (window.innerWidth || 400) - 40) });
+    marker.bindPopup(buildPopupContent(r), popupOpts());
     marker.bindTooltip(`<strong>${r.name}</strong> • ~${r.salons_est.toLocaleString('el-GR')} κομμωτήρια (${String(r.share_pct).replace('.', ',')}%)`,
         { sticky: true, direction: 'top', offset: [0, -12], className: 'nomos-tip', opacity: 1 });
     marker.on('mouseover', () => { map.getContainer().style.cursor = 'pointer'; });
@@ -1298,9 +1310,18 @@ function addNomoiLayer(geojson) {
             const r = regionByName[regionName];
             if (!r) return;
 
-            layer.bindPopup(buildPopupContent(r), { maxWidth: Math.min(380, (window.innerWidth || 400) - 40) });
             layer.bindTooltip(`<strong>${r.name}</strong> • ~${r.salons_est.toLocaleString('el-GR')} κομμωτήρια (${String(r.share_pct).replace('.', ',')}%)`,
                 { sticky: true, direction: 'top', offset: [0, -6], className: 'nomos-tip', opacity: 1 });
+
+            // Popup στο κέντρο του νομού (όχι στο σημείο του κλικ) για σταθερή, ορατή θέση
+            layer.on('click', () => {
+                selectNomos(regionName);
+                layer.closeTooltip();
+                L.popup(popupOpts())
+                    .setLatLng(layer.getBounds().getCenter())
+                    .setContent(buildPopupContent(r))
+                    .openOn(map);
+            });
 
             layer.on('mouseover', () => {
                 if (regionName !== selectedNomos) applyNomosStyle(regionName, NOMOS_HOVER);
@@ -1310,7 +1331,6 @@ function addNomoiLayer(geojson) {
                 resetNomosStyle(regionName);
                 map.getContainer().style.cursor = '';
             });
-            layer.on('click', () => selectNomos(regionName));
 
             if (!nomosLayersByName[regionName]) nomosLayersByName[regionName] = [];
             nomosLayersByName[regionName].push(layer);
@@ -1336,7 +1356,7 @@ function drawNomoiCirclesFallback() {
             radius: size / 2, fillColor: '#0ea5e9', color: '#fff',
             weight: 2, opacity: 0.95, fillOpacity: 0.85
         }).addTo(map);
-        marker.bindPopup(buildPopupContent(r), { maxWidth: Math.min(380, (window.innerWidth || 400) - 40) });
+    marker.bindPopup(buildPopupContent(r), popupOpts());
         marker.regionData = r;
         markers.push(marker);
     });
