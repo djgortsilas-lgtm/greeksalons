@@ -52,6 +52,22 @@
             .leaflet-control-layers { font-size: 12px; }
         }
         .map-label-num { font-size: 0.85em; color: #0284c7; font-weight: 700; }
+        .nomos-tip {
+            background: rgba(255,255,255,0.97) !important; border: 2px solid #0ea5e9 !important;
+            border-radius: 10px !important; color: #0369a1 !important;
+            font-size: 11px !important; font-weight: 700 !important;
+            box-shadow: 0 4px 16px rgba(15,23,42,0.18) !important; padding: 5px 10px !important;
+        }
+        .nomos-tip::before { display: none !important; }
+        .map-hint {
+            position: fixed; left: 24px; bottom: 24px; z-index: 1000; pointer-events: none;
+            background: rgba(255,255,255,0.95); border: 2px solid #0ea5e9; border-radius: 10px;
+            padding: 7px 14px; font-size: 11px; color: #0369a1; font-weight: 700;
+            box-shadow: 0 2px 12px rgba(15,23,42,0.12);
+        }
+        @media (max-width: 640px) {
+            .map-hint { left: 8px; bottom: 12px; font-size: 10px; padding: 6px 10px; }
+        }
         #tableBtn { background: linear-gradient(135deg,#0284c7,#0ea5e9); color:#fff; border:1px solid #0284c7; padding:8px 18px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:800; letter-spacing:0.5px; box-shadow:0 2px 10px rgba(2,132,199,0.35); white-space:nowrap; }
         #tableBtn:hover { filter: brightness(1.1); }
         #perifAnalysis table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 8px; }
@@ -244,6 +260,7 @@
     </div>
 </div>
 
+<div class="map-hint" id="mapHint">⏳ Φόρτωση ορίων νομών…</div>
 <div id="map"></div>
 
 <script>
@@ -1186,28 +1203,57 @@ function _armFallbackOnce(layer) {
 _fallbackChain.forEach(_armFallback);
 _armFallbackOnce(cartoLight);
 
-const markers = [];
+const markers = [];       // κυκλικά markers μόνο για τις 2 πόλεις (Αθήνα/Θεσσαλονίκη — δεν έχουν πολύγωνο)
 const labelMarkers = [];
+const nomosLayersByName = {};  // όνομα περιοχής -> [polygon layers] (η Αττική έχει 4 πολύγωνα)
+let nomosGeoLoaded = false;
+let selectedNomos = null;
 
-regions.forEach(r => {
-    // Μέγεθος ανάλογα με τα κομμωτήρια, ενιαίο χρώμα
-    const size = Math.max(14, Math.min(52, 10 + Math.sqrt(r.salons_est) * 0.9));
+const regionByName = {};
+regions.forEach(r => { regionByName[r.name] = r; });
 
+// --- Στυλ πολυγώνων νομών ---
+const NOMOS_STYLE = { fillColor: '#0ea5e9', fillOpacity: 0.28, color: '#0284c7', weight: 1.5, opacity: 0.9 };
+const NOMOS_HOVER = { fillColor: '#0ea5e9', fillOpacity: 0.55, color: '#0369a1', weight: 3, opacity: 1 };
+const NOMOS_SELECTED = { fillColor: '#0284c7', fillOpacity: 0.6, color: '#075985', weight: 3, opacity: 1 };
+
+function applyNomosStyle(name, style) {
+    (nomosLayersByName[name] || []).forEach(l => l.setStyle(style));
+}
+function resetNomosStyle(name) {
+    applyNomosStyle(name, name === selectedNomos ? NOMOS_SELECTED : NOMOS_STYLE);
+}
+function selectNomos(name) {
+    const prev = selectedNomos;
+    selectedNomos = name;
+    if (prev && prev !== name) resetNomosStyle(prev);
+    if (name) applyNomosStyle(name, NOMOS_SELECTED);
+}
+map.on('popupclose', () => selectNomos(null));
+
+// --- Πόλεις: παραμένουν κυκλικά markers πάνω από τα πολύγωνα ---
+regions.filter(r => r.is_city).forEach(r => {
     L.circleMarker([r.lat, r.lng], {
-        radius: size / 2 + 4, fillColor: '#0ea5e9', color: 'transparent', weight: 0, fillOpacity: 0.22
+        radius: 14, fillColor: '#075985', color: '#fff',
+        weight: 3, opacity: 0.95, fillOpacity: 0.9
     }).addTo(map);
 
     const marker = L.circleMarker([r.lat, r.lng], {
-        radius: size / 2, fillColor: '#0ea5e9', color: '#fff',
-        weight: r.is_city ? 3 : 2, opacity: 0.95, fillOpacity: 0.85
+        radius: 10, fillColor: '#0ea5e9', color: '#fff',
+        weight: 3, opacity: 0.95, fillOpacity: 0.9
     }).addTo(map);
 
-    const popupContent = buildPopupContent(r);
-
-    marker.bindPopup(popupContent, { maxWidth: Math.min(380, (window.innerWidth || 400) - 40) });
+    marker.bindPopup(buildPopupContent(r), { maxWidth: Math.min(380, (window.innerWidth || 400) - 40) });
+    marker.bindTooltip(`<strong>${r.name}</strong> • ~${r.salons_est.toLocaleString('el-GR')} κομμωτήρια (${String(r.share_pct).replace('.', ',')}%)`,
+        { sticky: true, direction: 'top', offset: [0, -12], className: 'nomos-tip', opacity: 1 });
+    marker.on('mouseover', () => { map.getContainer().style.cursor = 'pointer'; });
+    marker.on('mouseout', () => { map.getContainer().style.cursor = ''; });
     marker.regionData = r;
     markers.push(marker);
+});
 
+// --- Ετικέτες όλων των περιοχών (παραμένουν στα ίδια σημεία) ---
+regions.forEach(r => {
     labelMarkers.push(L.marker([r.lat, r.lng], {
         icon: L.divIcon({
             className: '',
@@ -1216,6 +1262,105 @@ regions.forEach(r => {
         })
     }).addTo(map));
 });
+
+// --- Αντιστοίχιση ονομάτων GeoJSON (αγγλικά) -> ονόματα δεδομένων (ελληνικά) ---
+// Πηγή: codeforgermany/click_that_hood — παλιοί νομοί. Η Αττική έρχεται σε 4 κομμάτια
+// (Athens, Peiraias and islands, East/West Attica) που συγχωνεύονται σε μία περιοχή.
+const GEO_TO_REGION = {
+    'Pella': 'Πέλλα', 'Euritania': 'Ευρυτανία', 'Larisa': 'Λάρισα', 'Lakonia': 'Λακωνία',
+    'Heraklio': 'Ηράκλειο', 'Evros': 'Έβρος', 'Samos': 'Σάμος',
+    'Peiraias and islands': 'Αττική', 'Athens': 'Αττική', 'East Attica': 'Αττική', 'West Attica': 'Αττική',
+    'Chalkidiki': 'Χαλκιδική', 'Serres': 'Σέρρες', 'Kozani': 'Κοζάνη', 'Imathia': 'Ημαθία',
+    'Fthiotida': 'Φθιώτιδα', 'Chios': 'Χίος', 'Achaia': 'Αχαΐα', 'Florina': 'Φλώρινα',
+    'Preveza': 'Πρέβεζα', 'Evia': 'Εύβοια', 'Grevena': 'Γρεβενά',
+    'Kefallonia': 'Κεφαλληνία', 'Rodopi': 'Ροδόπη', 'Korinthos': 'Κορινθία',
+    'Chania': 'Χανιά', 'Lesvos': 'Λέσβος', 'Arkadia': 'Αρκαδία', 'Kastoria': 'Καστοριά',
+    'Zakynthos': 'Ζάκυνθος', 'Drama': 'Δράμα', 'Kyklades': 'Κυκλάδες', 'Lefkada': 'Λευκάδα',
+    'Viotia': 'Βοιωτία', 'Lasithio': 'Λασίθι', 'Rethymno': 'Ρέθυμνο', 'Magnisia': 'Μαγνησία',
+    'Argolida': 'Αργολίδα', 'Kavala': 'Καβάλα', 'Ilia': 'Ηλεία', 'Karditsa': 'Καρδίτσα',
+    'Arta': 'Άρτα', 'Thessaloniki': 'Θεσσαλονίκης', 'Xanthi': 'Ξάνθη',
+    'Dodekanisa': 'Δωδεκάνησα', 'Kilkis': 'Κιλκίς', 'Mesinia': 'Μεσσηνία',
+    'Thesprotia': 'Θεσπρωτία', 'Trikala': 'Τρίκαλα', 'Kerkyra': 'Κέρκυρα',
+    'Pieria': 'Πιερία', 'Ioannina': 'Ιωάννινα', 'Fokida': 'Φωκίδα',
+    'Aitoloakarnania': 'Αιτωλοακαρνανία'
+    // 'Agio oros': παραλείπεται (Άγιο Όρος — χωρίς στοιχεία)
+};
+
+function addNomoiLayer(geojson) {
+    L.geoJSON(geojson, {
+        style: NOMOS_STYLE,
+        filter: f => {
+            const n = f && f.properties && GEO_TO_REGION[f.properties.name];
+            return !!n && !!regionByName[n];
+        },
+        onEachFeature: (feature, layer) => {
+            const regionName = GEO_TO_REGION[feature.properties.name];
+            const r = regionByName[regionName];
+            if (!r) return;
+
+            layer.bindPopup(buildPopupContent(r), { maxWidth: Math.min(380, (window.innerWidth || 400) - 40) });
+            layer.bindTooltip(`<strong>${r.name}</strong> • ~${r.salons_est.toLocaleString('el-GR')} κομμωτήρια (${String(r.share_pct).replace('.', ',')}%)`,
+                { sticky: true, direction: 'top', offset: [0, -6], className: 'nomos-tip', opacity: 1 });
+
+            layer.on('mouseover', () => {
+                if (regionName !== selectedNomos) applyNomosStyle(regionName, NOMOS_HOVER);
+                map.getContainer().style.cursor = 'pointer';
+            });
+            layer.on('mouseout', () => {
+                resetNomosStyle(regionName);
+                map.getContainer().style.cursor = '';
+            });
+            layer.on('click', () => selectNomos(regionName));
+
+            if (!nomosLayersByName[regionName]) nomosLayersByName[regionName] = [];
+            nomosLayersByName[regionName].push(layer);
+        }
+    }).addTo(map);
+
+    // Οι πόλεις (markers) να παραμείνουν κλικάρισμα πάνω από τα πολύγωνα
+    markers.forEach(m => m.bringToFront());
+
+    nomosGeoLoaded = true;
+    const hint = document.getElementById('mapHint');
+    if (hint) hint.textContent = '🖱️ Πέρασε το ποντίκι πάνω από έναν νομό — κλικ για στοιχεία';
+}
+
+// Fallback χωρίς internet: οι παλιοί μπλε κύκλοι για τους νομούς
+function drawNomoiCirclesFallback() {
+    regions.filter(r => !r.is_city).forEach(r => {
+        const size = Math.max(14, Math.min(52, 10 + Math.sqrt(r.salons_est) * 0.9));
+        L.circleMarker([r.lat, r.lng], {
+            radius: size / 2 + 4, fillColor: '#0ea5e9', color: 'transparent', weight: 0, fillOpacity: 0.22
+        }).addTo(map);
+        const marker = L.circleMarker([r.lat, r.lng], {
+            radius: size / 2, fillColor: '#0ea5e9', color: '#fff',
+            weight: 2, opacity: 0.95, fillOpacity: 0.85
+        }).addTo(map);
+        marker.bindPopup(buildPopupContent(r), { maxWidth: Math.min(380, (window.innerWidth || 400) - 40) });
+        marker.regionData = r;
+        markers.push(marker);
+    });
+    const hint = document.getElementById('mapHint');
+    if (hint) hint.style.display = 'none';
+}
+
+const NOMOS_GEO_URLS = [
+    'https://cdn.jsdelivr.net/gh/codeforgermany/click_that_hood@main/public/data/greece-prefectures.geojson',
+    'https://raw.githubusercontent.com/codeforgermany/click_that_hood/main/public/data/greece-prefectures.geojson'
+];
+(async function loadNomoiGeo() {
+    for (const u of NOMOS_GEO_URLS) {
+        try {
+            const res = await fetch(u);
+            if (!res.ok) continue;
+            const gj = await res.json();
+            if (!gj.features || !gj.features.length) continue;
+            addNomoiLayer(gj);
+            return;
+        } catch (e) { /* δοκιμή επόμενου URL */ }
+    }
+    drawNomoiCirclesFallback();
+})();
 
 // Ετικέτες: απόκρυψη σε κινητά όταν το zoom είναι μικρό (αποφυγή συνωστισμού)
 function updateLabels() {
@@ -1259,10 +1404,12 @@ buildRegionTable();
 renderPerifAnalysis();
 
 function highlightRegion(name) {
-    markers.forEach(m => { if (m.regionData.name === name) m.setStyle({ weight: 3, fillOpacity: 0.95 }); });
+    markers.forEach(m => { if (m.regionData.name === name) m.setStyle({ weight: 4, fillOpacity: 1 }); });
+    if (nomosLayersByName[name]) applyNomosStyle(name, NOMOS_HOVER);
 }
 function unhighlightRegion() {
-    markers.forEach(m => m.setStyle({ weight: m.regionData.is_city ? 3 : 2, fillOpacity: 0.75 }));
+    markers.forEach(m => m.setStyle({ weight: 3, fillOpacity: 0.85 }));
+    Object.keys(nomosLayersByName).forEach(n => resetNomosStyle(n));
 }
 
 // === DRAG FUNCTIONALITY ===
