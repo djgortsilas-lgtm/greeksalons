@@ -101,6 +101,9 @@
         .ft-scroll { overflow: auto; max-height: calc(90vh - 160px); -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
         #fullTable { width: 100%; border-collapse: collapse; font-size: 12px; }
         #fullTable th { position: sticky; top: 0; background: #f1f5f9; color: #475569; padding: 8px 10px; text-align: right; border-bottom: 2px solid #0ea5e9; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        #fullTable thead th { cursor: pointer; user-select: none; -webkit-user-select: none; white-space: nowrap; }
+        #fullTable thead th:hover { color: #0284c7; background: #e0f2fe; }
+        #fullTable thead th .sort-arrow { color: #0284c7; font-size: 9px; }
         #fullTable td { padding: 7px 10px; text-align: right; border-bottom: 1px solid #e2e8f0; color: #0f172a; }
         #fullTable td:nth-child(2), #fullTable th:nth-child(2) { text-align: left; }
         #fullTable tr.ft-city td { background: rgba(14,165,233,0.1); }
@@ -1668,7 +1671,24 @@ function toggleFullTable() {
     ov.style.display = open ? 'flex' : 'none';
 }
 function buildFullTable() {
-    const rows = [...regions].sort((a, b) => b.salons_est - a.salons_est);
+    // Θέση default κατάταξης (φθίνουσα σαλονιών) για τη στήλη '#'
+    if (regions[0]._defRank == null) {
+        [...regions].sort((a, b) => b.salons_est - a.salons_est).forEach((r, i) => { r._defRank = i + 1; });
+    }
+    const val = (r) => {
+        switch (ftSort.key) {
+            case 'rank': return r._defRank;
+            case 'name': return r.name;
+            case 'pps': return r.pps || -1;
+            default: return r[ftSort.key];
+        }
+    };
+    const rows = [...regions].sort((a, b) => {
+        const va = val(a), vb = val(b);
+        let cmp = (typeof va === 'string') ? va.localeCompare(vb, 'el') : va - vb;
+        if (cmp === 0) cmp = a.name.localeCompare(b.name, 'el');
+        return cmp * ftSort.dir;
+    });
     let html = '';
     rows.forEach((r, i) => {
         html += '<tr' + (r.is_city ? ' class="ft-city"' : '') + '><td>' + (i + 1) + '</td><td>' + (r.is_city ? '🏙️ ' : '') + r.name + '</td><td>' + r.salons_est.toLocaleString('el-GR') + '</td><td>' + String(r.share_pct).replace('.', ',') + '%</td><td>' + r.population.toLocaleString('el-GR') + '</td><td>' + r.pop_per_salon.toLocaleString('el-GR') + '</td><td>' + r.gdp_per_cap.toLocaleString('el-GR') + ' €</td><td>' + (r.pps ? r.pps.toLocaleString('el-GR') + ' • ' + String(r.pps_eu_pct).replace('.', ',') + '%' : '—') + '</td><td>' + String(r.poverty).replace('.', ',') + '%</td></tr>';
@@ -1678,6 +1698,29 @@ function buildFullTable() {
     const tS = nomoi.reduce((s, r) => s + r.salons_est, 0);
     const tP = nomoi.reduce((s, r) => s + r.population, 0);
     document.getElementById('fullTableFoot').innerHTML = '<tr><td></td><td>ΣΥΝΟΛΟ / Μ.Ο. (νομοί)</td><td>' + tS.toLocaleString('el-GR') + '</td><td>100%</td><td>' + tP.toLocaleString('el-GR') + '</td><td>' + Math.round(tP / tS).toLocaleString('el-GR') + '</td><td>21.301 €</td><td>26.400 • 69,3%</td><td>19,5%</td></tr>';
+    renderFtArrows();
+}
+// === ΤΑΞΙΝΟΜΗΣΗ ΠΙΝΑΚΑ με κλικ στους τίτλους στηλών ===
+const FT_KEYS = ['rank', 'name', 'salons_est', 'share_pct', 'population', 'pop_per_salon', 'gdp_per_cap', 'pps', 'poverty'];
+let ftSort = { key: 'salons_est', dir: -1 }; // default: φθίνουσα σαλονιών (όπως πριν)
+let _ftLabels = null;
+function sortFullTable(colIdx) {
+    const key = FT_KEYS[colIdx];
+    if (!key) return;
+    if (ftSort.key === key) ftSort.dir *= -1; // 2ο κλικ: αντιστροφή
+    else ftSort = { key, dir: key === 'name' ? 1 : -1 }; // 1ο κλικ: Α→Ω σε κείμενο, φθίνουσα σε αριθμούς
+    buildFullTable();
+}
+function renderFtArrows() {
+    const ths = document.querySelectorAll('#fullTable thead th');
+    if (!_ftLabels) {
+        _ftLabels = [...ths].map(th => th.textContent);
+        ths.forEach((th, i) => { th.title = 'Ταξινόμηση'; th.addEventListener('click', () => sortFullTable(i)); });
+    }
+    ths.forEach((th, i) => {
+        th.innerHTML = _ftLabels[i] + (FT_KEYS[i] === ftSort.key
+            ? ' <span class="sort-arrow">' + (ftSort.dir > 0 ? '▲' : '▼') + '</span>' : '');
+    });
 }
 function printFullTable() { window.print(); }
 function exportExcel() {
