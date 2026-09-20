@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Κομμωτήρια Ελλάδας - Χάρτης Ευκαιριών & Ανταγωνισμού</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f1f5f9; color: #0f172a; }
+        #map { height: 100vh; width: 100%; z-index: 1; }
+        
+        .header {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+            background: linear-gradient(135deg, #ffffff 0%, #e0f2fe 100%);
+            padding: 14px 28px; display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 2px solid #0ea5e9; box-shadow: 0 4px 20px rgba(14,165,233,0.15);
+        }
+        .header h1 { font-size: 19px; color: #0369a1; font-weight: 700; letter-spacing: 0.5px; }
+        .header .subtitle { font-size: 11px; color: #64748b; margin-top: 3px; }
+        
+        .draggable-panel {
+            position: fixed; z-index: 1000;
+            background: rgba(255, 255, 255, 0.97); border: 2px solid #e2e8f0;
+            border-radius: 14px; backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(15,23,42,0.12); overflow: hidden;
+        }
+        .panel-header {
+            padding: 10px 16px; cursor: move; user-select: none;
+            background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%);
+            border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between;
+        }
+        .panel-header h3 { font-size: 11px; color: #0284c7; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; }
+        .panel-header .drag-hint { font-size: 9px; color: #94a3b8; }
+        .collapse-btn {
+            background: #fff; border: 1px solid #cbd5e1; color: #0284c7;
+            width: 22px; height: 22px; border-radius: 6px; cursor: pointer;
+            font-size: 14px; font-weight: 800; line-height: 1; padding: 0;
+        }
+        .collapse-btn:hover { border-color: #0ea5e9; background: rgba(14,165,233,0.1); }
+        .draggable-panel.collapsed .panel-body { display: none; }
+        .panel-header { touch-action: none; }
+        @media (max-width: 640px) {
+            .header { padding: 10px 14px; }
+            .header h1 { font-size: 14px; }
+            .header .subtitle { font-size: 9px; }
+            .stats-panel { top: 64px; left: 8px; right: 8px; width: auto; max-height: 48vh; }
+            .stats-panel .panel-body { max-height: calc(48vh - 52px); }
+            .stat-card { padding: 10px; }
+            .stat-card .value { font-size: 17px; }
+            .leaflet-control-layers { font-size: 12px; }
+        }
+        .map-label-num { font-size: 0.85em; color: #0284c7; font-weight: 700; }
+        #tableBtn { background: linear-gradient(135deg,#0284c7,#0ea5e9); color:#fff; border:1px solid #0284c7; padding:8px 18px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:800; letter-spacing:0.5px; box-shadow:0 2px 10px rgba(2,132,199,0.35); white-space:nowrap; }
+        #tableBtn:hover { filter: brightness(1.1); }
+        #perifAnalysis table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 8px; }
+        #perifAnalysis th { background: #f1f5f9; color: #475569; padding: 6px 4px; font-size: 9px; text-transform: uppercase; }
+        #perifAnalysis td { padding: 5px 4px; border-bottom: 1px solid #e2e8f0; text-align: right; }
+        #perifAnalysis td:nth-child(1), #perifAnalysis th:nth-child(1) { text-align: left; }
+        #fullTableOverlay { position: fixed; inset: 0; z-index: 2000; background: rgba(15,23,42,0.45); display: none; align-items: center; justify-content: center; padding: 20px; }
+        #fullTableOverlay .ft-content { background: #ffffff; border: 2px solid #0ea5e9; border-radius: 14px; max-width: 1040px; width: 100%; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 12px 48px rgba(15,23,42,0.25); }
+        .ft-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 18px; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; }
+        .ft-header h2 { font-size: 16px; color: #0369a1; }
+        .ft-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .ft-actions button { background: #f8fafc; border: 1px solid #0ea5e9; color: #0f172a; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 700; }
+        .ft-actions button:hover { background: rgba(14,165,233,0.12); }
+        .ft-sub { padding: 8px 18px; font-size: 10px; color: #64748b; border-bottom: 1px solid #f1f5f9; }
+        .ft-scroll { overflow: auto; max-height: calc(90vh - 160px); }
+        #fullTable { width: 100%; border-collapse: collapse; font-size: 12px; }
+        #fullTable th { position: sticky; top: 0; background: #f1f5f9; color: #475569; padding: 8px 10px; text-align: right; border-bottom: 2px solid #0ea5e9; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        #fullTable td { padding: 7px 10px; text-align: right; border-bottom: 1px solid #e2e8f0; color: #0f172a; }
+        #fullTable td:nth-child(2), #fullTable th:nth-child(2) { text-align: left; }
+        #fullTable tr.ft-city td { background: rgba(14,165,233,0.1); }
+        #fullTable tfoot td { font-weight: 800; color: #15803d; border-top: 2px solid #0ea5e9; background: #f0fdf4; }
+        @media print {
+            body > *:not(#fullTableOverlay) { display: none !important; }
+            #fullTableOverlay { position: static; display: block !important; background: #fff; padding: 0; }
+            #fullTableOverlay .ft-content { max-height: none; max-width: 100%; border: none; box-shadow: none; background: #fff; }
+            .ft-actions { display: none !important; }
+            .ft-scroll { max-height: none; overflow: visible; }
+            .ft-header h2, .ft-sub, #fullTable td, #fullTable th { color: #000; }
+            #fullTable th { background: #eee !important; }
+            #fullTable tfoot td { color: #000; background: #eee; }
+        }
+        @media (max-width: 640px) {
+            .ft-header h2 { font-size: 13px; }
+            #fullTable { font-size: 11px; }
+            #tableBtn { padding: 7px 12px; font-size: 12px; }
+            #fullTableOverlay { padding: 8px; }
+        }
+
+        .panel-body { padding: 14px 16px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-height: 0; }
+        .stats-panel .panel-body { max-height: calc(100vh - 150px); }
+        
+        .legend { bottom: 24px; left: 24px; min-width: 280px; }
+        .legend .panel-body { max-height: 300px; }
+        .legend-item { display: flex; align-items: center; margin: 6px 0; font-size: 11px; color: #334155; }
+        .legend-dot { width: 14px; height: 14px; border-radius: 50%; margin-right: 8px; border: 2px solid rgba(255,255,255,0.9); box-shadow: 0 1px 6px rgba(15,23,42,0.35); flex-shrink: 0; }
+        
+        .stats-panel { top: 64px; right: 16px; width: 290px; max-height: calc(100vh - 84px); display: flex; flex-direction: column; }
+        .stat-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+            border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; margin-bottom: 8px;
+            border-left: 3px solid #0ea5e9;
+        }
+        .stat-card .label { font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+        .stat-card .value { font-size: 20px; color: #0f172a; font-weight: 800; margin: 4px 0; }
+        .stat-card .change { font-size: 10px; color: #475569; }
+        .stat-card .change.up { color: #15803d; }
+        .stat-card .change.down { color: #dc2626; }
+        
+        .table-panel { bottom: 24px; right: 16px; width: 500px; }
+        .table-panel .panel-body { max-height: 350px; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 10px; color: #0f172a; }
+        th { background: #f1f5f9; color: #475569; padding: 7px 5px; text-align: left; position: sticky; top: 0; border-bottom: 2px solid #e2e8f0; font-weight: 700; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; z-index: 1; }
+        td { padding: 6px 5px; border-bottom: 1px solid #e2e8f0; }
+        tr:hover td { background: rgba(14, 165, 233, 0.08); }
+        tr.highlight td { background: rgba(21, 128, 61, 0.08); }
+        tr.city-row td { background: rgba(14, 165, 233, 0.08); font-style: italic; }
+        
+        .opp-high { color: #15803d; font-weight: 700; }
+        .opp-med { color: #b45309; font-weight: 700; }
+        .opp-low { color: #dc2626; font-weight: 700; }
+        .comp-high { color: #dc2626; font-weight: 700; }
+        .comp-med { color: #ea580c; font-weight: 700; }
+        .comp-low { color: #15803d; font-weight: 700; }
+        
+        .filter-bar {
+            position: fixed; top: 64px; left: 24px; z-index: 1000;
+            display: flex; gap: 8px; flex-wrap: wrap;
+        }
+        .filter-bar-group {
+            display: flex; gap: 5px; align-items: center;
+            background: rgba(255, 255, 255, 0.94); border: 2px solid #e2e8f0;
+            border-radius: 10px; padding: 4px 8px; backdrop-filter: blur(8px);
+            box-shadow: 0 2px 12px rgba(15,23,42,0.08);
+        }
+        .filter-bar-group .group-label { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-right: 2px; }
+        .filter-btn {
+            background: #fff; border: 1px solid #cbd5e1; color: #475569; padding: 5px 12px; border-radius: 8px; cursor: pointer; font-size: 10px; font-weight: 600; transition: all 0.25s;
+        }
+        .filter-btn:hover { border-color: #0ea5e9; color: #0284c7; background: rgba(14,165,233,0.1); }
+        .filter-btn.active { background: linear-gradient(135deg, #0284c7, #0ea5e9); color: #fff; border-color: #0284c7; box-shadow: 0 2px 10px rgba(2,132,199,0.35); }
+
+        .leaflet-popup-content-wrapper {
+            background: #ffffff !important; border: 2px solid #0ea5e9 !important; border-radius: 14px !important; color: #0f172a !important; box-shadow: 0 8px 32px rgba(15,23,42,0.18) !important;
+        }
+        .leaflet-popup-tip { background: #ffffff !important; border: 1px solid #e2e8f0 !important; }
+        .popup-title { font-size: 16px; font-weight: 800; color: #0369a1; margin-bottom: 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+        .popup-title .city-badge { display: inline-block; background: rgba(14,165,233,0.12); border: 1px solid #0ea5e9; border-radius: 6px; padding: 2px 8px; font-size: 9px; color: #0284c7; margin-left: 6px; vertical-align: middle; }
+        .popup-row { display: flex; justify-content: space-between; margin: 4px 0; font-size: 11px; }
+        .popup-row .label { color: #64748b; }
+        .popup-row .val { color: #0f172a; font-weight: 700; }
+        .popup-row.popup-highlight { background: rgba(14,165,233,0.12); border: 1px solid #0ea5e9; border-radius: 8px; padding: 6px 8px; margin: 6px 0; font-size: 13px; }
+        .popup-row.popup-highlight .label { color: #0369a1; font-weight: 800; }
+        .popup-row.popup-highlight .val { color: #0369a1; font-weight: 800; font-size: 14px; }
+        .popup-opp { margin-top: 8px; padding: 8px; border-radius: 8px; font-size: 12px; font-weight: 800; text-align: center; letter-spacing: 1px; }
+        .popup-opp.high { background: rgba(21, 128, 61, 0.1); color: #15803d; border: 2px solid rgba(21, 128, 61, 0.3); }
+        .popup-opp.med { background: rgba(180, 83, 9, 0.1); color: #b45309; border: 2px solid rgba(180, 83, 9, 0.3); }
+        .popup-opp.low { background: rgba(220, 38, 38, 0.08); color: #dc2626; border: 2px solid rgba(220, 38, 38, 0.3); }
+        
+        .popup-competition { margin-top: 8px; padding: 8px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; }
+        .popup-competition h4 { font-size: 10px; color: #ea580c; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+        .popup-comp-bar { height: 6px; border-radius: 3px; background: #e2e8f0; margin: 3px 0; overflow: hidden; }
+        .popup-comp-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+        .popup-comp-label { font-size: 9px; color: #64748b; display: flex; justify-content: space-between; margin-bottom: 1px; }
+        .popup-purch { margin-top: 8px; padding: 8px; border-radius: 8px; font-size: 12px; font-weight: 800; text-align: center; letter-spacing: 0.5px; }
+        .popup-purch.high { background: rgba(21,128,61,0.1); color: #15803d; border: 2px solid rgba(21,128,61,0.3); }
+        .popup-purch.mid { background: rgba(180,83,9,0.1); color: #b45309; border: 2px solid rgba(180,83,9,0.3); }
+        .popup-purch.low { background: rgba(220,38,38,0.08); color: #dc2626; border: 2px solid rgba(220,38,38,0.3); }
+        .purch-high { color: #15803d; font-weight: 700; }
+        .purch-mid { color: #b45309; font-weight: 700; }
+        .purch-low { color: #dc2626; font-weight: 700; }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h1>ΚΟΜΜΩΤΗΡΙΑ ΕΛΛΑΔΑΣ — Χάρτης ανά Νομό 2026</h1>
+        <div class="subtitle">Εκτίμηση 2026 ανά νομό (51 νομοί + Αθήνα & Θεσσαλονίκη) | Poidata 7/2026 • ELSTAT Απογραφή 2021 & SBR 2023 • Περιφερειακοί Λογαριασμοί 2023 • SILC 2023 • Eurostat PPS 2023 • ΚΟΚΚΚΕ 2023</div>
+    </div>
+    <button id="tableBtn" onclick="toggleFullTable()">📋 Πίνακας</button>
+</div>
+
+<div class="draggable-panel stats-panel" id="panelStats">
+    <div class="panel-header" onpointerdown="startDrag(event, 'panelStats')">
+        <h3>Συνολικά Στοιχεία</h3>
+        <span style="display:flex;gap:8px;align-items:center;">
+            <span class="drag-hint">⠿ σύρε</span>
+            <button class="collapse-btn" onclick="toggleCollapse(event, 'panelStats', this)" onpointerdown="event.stopPropagation()" title="Ελαχιστοποίηση">−</button>
+        </span>
+    </div>
+    <div class="panel-body">
+        <div class="stat-card"><div class="label">Κομμωτήρια 2026 (Poidata, Jul 2026)</div><div class="value">7.474</div><div class="change up">Google-verified listings πανελλαδικά</div></div>
+        <div class="stat-card"><div class="label">Αθήνα (πόλη) — αριθμός & %</div><div class="value">593 • 7,9%</div><div class="change">≈23.2% του νομού Αττικής</div></div>
+        <div class="stat-card"><div class="label">Θεσσαλονίκη (πόλη) — αριθμός & %</div><div class="value">365 • 4,9%</div><div class="change">≈46.5% του νομού • Σωματείο 2022: ~2.000</div></div>
+        <div class="stat-card"><div class="label">Πληθυσμός (Απογραφή ELSTAT 2021)</div><div class="value">10,455,563</div><div class="change down">Μ.Ο. 1,399 κάτοικοι / σαλόνι</div></div>
+        <div class="stat-card"><div class="label">Σκιώδης αγορά (ΚΟΚΚΚΕ 7/2023)</div><div class="value" style="font-size:14px; color:#b45309;">~23.000 παράνομα</div><div class="change">Δεν εισπράττει το κράτος — αθέμιτος ανταγωνισμός</div></div>
+        <div class="stat-card"><div class="label">Αγοραστική δύναμη — Μ.Ο. Ελλάδας (ΕΛΣΤΑΤ 2023 / Eurostat PPS 2023)</div><div class="value" style="font-size:14px;">21.301 € κ.κ. • 26.400 PPS (69% ΕΕ)</div><div class="change">Αττική: 29.732 € • 36.700 PPS (96% ΕΕ) — υψηλότερη | Β. Αιγαίο: 13.136 € • 16.100 PPS (42% ΕΕ) — χαμηλότερη</div></div>
+        <div class="stat-card"><div class="label">Μεγαλύτερος όγκος — Ν. Αττικής</div><div class="value" style="font-size:14px; color:#15803d;">2,557 (34.2%)</div><div class="change">Θεσσαλονίκης: 785 (10.5%)</div></div>
+        <div class="stat-card"><div class="label">Περαιτέρω ανάλυση — Σύνολα ανά περιφέρεια (13 NUTS2, χωρίς διπλομέτρηση πόλεων)</div><div class="change">Υπολογισμός από νομούς • ενσωματωμένα στοιχεία 2026</div><div id="perifAnalysis"></div><div class="change" style="margin-top:6px;">Πηγές: Poidata 7/2026 • ELSTAT Απογραφή 2021 • Περιφερειακοί Λογαριασμοί 2023 • SILC 2023 • Eurostat PPS 2023</div></div>
+    </div>
+</div>
+
+<div class="draggable-panel table-panel" id="panelTable" style="display:none;"><!-- κρυφό κατόπιν αιτήματος: εμφανίζεται μόνο το γενικό πάνελ στατιστικών -->
+    <div class="panel-header" onpointerdown="startDrag(event, 'panelTable')">
+        <h3>Κατάταξη Νομών & Πόλεων 2026 (αριθμός & %)</h3>
+        <span class="drag-hint">⠿ σύρε</span>
+    </div>
+    <div class="panel-body">
+        <table>
+            <thead><tr><th>#</th><th>Νομός</th><th>Σαλόνια</th><th>%</th><th>Κ/Κ</th><th>Ευκαιρία</th><th>Ανταγ.</th></tr></thead>
+            <tbody id="regionTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="fullTableOverlay" style="display:none;" onclick="if(event.target===this)toggleFullTable()">
+    <div class="ft-content">
+        <div class="ft-header">
+            <h2>Κομμωτήρια Ελλάδας 2026 — Συγκεντρωτικός Πίνακας</h2>
+            <div class="ft-actions">
+                <button onclick="printFullTable()">🖨️ Εκτύπωση</button>
+                <button onclick="exportExcel()">📥 Excel</button>
+                <button onclick="toggleFullTable()">✕ Κλείσιμο</button>
+            </div>
+        </div>
+        <div class="ft-sub">51 νομοί + Αθήνα & Θεσσαλονίκη (οι πόλεις περιλαμβάνονται στους νομούς — δεν προστίθενται στο σύνολο) | Πηγές: Poidata 7/2026 • ELSTAT Απογραφή 2021 • ELSTAT Περιφερειακοί Λογαριασμοί 2023 (ΑΕΠ κ.κ. €) • ELSTAT SILC 2023 (κίνδυνος φτώχειας) • Eurostat PPS 2023 (αγοραστική δύναμη, ΕΕ-27=38.100)</div>
+        <div class="ft-scroll">
+            <table id="fullTable">
+                <thead><tr><th>#</th><th>Νομός / Πόλη</th><th>Κομμωτήρια</th><th>% Εθνικού</th><th>Πληθυσμός 2021</th><th>Κάτ./Σαλόνι</th><th>ΑΕΠ κ.κ. € ('23)</th><th>PPS • %ΕΕ</th><th>Φτώχεια</th></tr></thead>
+                <tbody id="fullTableBody"></tbody>
+                <tfoot id="fullTableFoot"></tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="map"></div>
+
+<script>
+const regions = [
+    {
+        name: "Αττική", lat: 38.18, lng: 23.95,
+        population: 3814064, salons_est: 2557,
+        gdp_per_cap: 29732, poverty: 13.7,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "Αθήνα, Πειραιάς, Περιστέρι, Γλυφάδα, Καλλιθέα",
+        notes: "Poidata 7/2026: Αθήνα 593, Πειραιάς 136, Περιστέρι 111, Γλυφάδα 82, Καλλιθέα 73. Εκτίμηση 2026: 2557 σαλόνια (34.2% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "high", intensity: 92,
+            distributors: ["Wella Hellas δίκτυο", "L'Oréal Professionnel", "Schwarzkopf / Goldwell"],
+            brands: { dye: 92, shampoo: 94, treatment: 86 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella Koleston, L'Oréal Majirel, Schwarzkopf Igora"
+        }
+    },
+    {
+        name: "Θεσσαλονίκης", lat: 40.78, lng: 23.1,
+        population: 1110312, salons_est: 785,
+        gdp_per_cap: 18200, poverty: 22.0,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "Θεσσαλονίκη, Καλαμαριά, Εύοσμος",
+        notes: "Poidata 7/2026: Θεσσαλονίκη 365, Καλαμαριά 76, Εύοσμος 70. Εκτίμηση 2026: 785 σαλόνια (10.5% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "high", intensity: 80,
+            distributors: ["Wella Hellas δίκτυο", "L'Oréal Professionnel", "Schwarzkopf / Goldwell"],
+            brands: { dye: 92, shampoo: 94, treatment: 86 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella Koleston, L'Oréal Majirel, Schwarzkopf Igora"
+        }
+    },
+    {
+        name: "Αιτωλοακαρνανία", lat: 38.6, lng: 21.4,
+        population: 192345, salons_est: 136,
+        gdp_per_cap: 15210, poverty: 30.6,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 136 σαλόνια (1.8% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Αργολίδα", lat: 37.6, lng: 22.8,
+        population: 93934, salons_est: 74,
+        gdp_per_cap: 17841, poverty: 25.6,
+        is_tourist: true, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 74 σαλόνια (1.0% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Αρκαδία", lat: 37.5, lng: 22.35,
+        population: 77592, salons_est: 55,
+        gdp_per_cap: 17841, poverty: 25.6,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 55 σαλόνια (0.7% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "low", intensity: 38,
+            distributors: ["Εξυπηρέτηση από Αθήνα/Θεσσαλονίκη", "Περιορισμένο τοπικό δίκτυο"],
+            brands: { dye: 32, shampoo: 30, treatment: 24 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Βασικές σειρές Wella, value brands"
+        }
+    },
+    {
+        name: "Άρτα", lat: 39.15, lng: 21.0,
+        population: 63668, salons_est: 45,
+        gdp_per_cap: 13789, poverty: 15.1,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 45 σαλόνια (0.6% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "low", intensity: 38,
+            distributors: ["Εξυπηρέτηση από Αθήνα/Θεσσαλονίκη", "Περιορισμένο τοπικό δίκτυο"],
+            brands: { dye: 32, shampoo: 30, treatment: 24 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Βασικές σειρές Wella, value brands"
+        }
+    },
+    {
+        name: "Αχαΐα", lat: 38.15, lng: 21.85,
+        population: 296574, salons_est: 226,
+        gdp_per_cap: 15210, poverty: 30.6,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "Πάτρα",
+        notes: "Poidata 7/2026: Πάτρα 146. Εκτίμηση 2026: 226 σαλόνια (3.0% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 62,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Βοιωτία", lat: 38.45, lng: 23.0,
+        population: 119248, salons_est: 84,
+        gdp_per_cap: 18469, poverty: 20.6,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 84 σαλόνια (1.1% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Γρεβενά", lat: 40.05, lng: 21.45,
+        population: 26576, salons_est: 16,
+        gdp_per_cap: 15543, poverty: 27.4,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 16 σαλόνια (0.2% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "low", intensity: 28,
+            distributors: ["Εξυπηρέτηση από Αθήνα/Θεσσαλονίκη", "Περιορισμένο τοπικό δίκτυο"],
+            brands: { dye: 32, shampoo: 30, treatment: 24 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Βασικές σειρές Wella, value brands"
+        }
+    },
+    {
+        name: "Δράμα", lat: 41.15, lng: 24.15,
+        population: 86643, salons_est: 61,
+        gdp_per_cap: 13840, poverty: 23.1,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 61 σαλόνια (0.8% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "low", intensity: 38,
+            distributors: ["Εξυπηρέτηση από Αθήνα/Θεσσαλονίκη", "Περιορισμένο τοπικό δίκτυο"],
+            brands: { dye: 32, shampoo: 30, treatment: 24 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Βασικές σειρές Wella, value brands"
+        }
+    },
+    {
+        name: "Δωδεκάνησα", lat: 36.3, lng: 27.8,
+        population: 224355, salons_est: 178,
+        gdp_per_cap: 21610, poverty: 16.0,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "Ρόδος",
+        notes: "Poidata 7/2026: Ρόδος 58. Εκτίμηση 2026: 178 σαλόνια (2.4% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 62,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Έβρος", lat: 41.2, lng: 26.0,
+        population: 133802, salons_est: 95,
+        gdp_per_cap: 13840, poverty: 23.1,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 95 σαλόνια (1.3% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Εύβοια", lat: 38.55, lng: 23.6,
+        population: 209132, salons_est: 165,
+        gdp_per_cap: 18469, poverty: 20.6,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 165 σαλόνια (2.2% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 62,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Ευρυτανία", lat: 38.95, lng: 21.7,
+        population: 17627, salons_est: 11,
+        gdp_per_cap: 18469, poverty: 20.6,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 11 σαλόνια (0.1% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "low", intensity: 28,
+            distributors: ["Εξυπηρέτηση από Αθήνα/Θεσσαλονίκη", "Περιορισμένο τοπικό δίκτυο"],
+            brands: { dye: 32, shampoo: 30, treatment: 24 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Βασικές σειρές Wella, value brands"
+        }
+    },
+    {
+        name: "Ζάκυνθος", lat: 37.75, lng: 20.75,
+        population: 39015, salons_est: 31,
+        gdp_per_cap: 19502, poverty: 21.1,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 31 σαλόνια (0.4% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Ηλεία", lat: 37.65, lng: 21.55,
+        population: 149347, salons_est: 106,
+        gdp_per_cap: 15210, poverty: 30.6,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 106 σαλόνια (1.4% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Ημαθία", lat: 40.55, lng: 22.25,
+        population: 124371, salons_est: 88,
+        gdp_per_cap: 16982, poverty: 25.4,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 88 σαλόνια (1.2% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Ηράκλειο", lat: 35.25, lng: 25.1,
+        population: 305017, salons_est: 241,
+        gdp_per_cap: 18345, poverty: 14.2,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "Ηράκλειο πόλη",
+        notes: "Poidata 7/2026: Ηράκλειο πόλη 162. Εκτίμηση 2026: 241 σαλόνια (3.2% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 62,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Θεσπρωτία", lat: 39.5, lng: 20.35,
+        population: 40804, salons_est: 32,
+        gdp_per_cap: 13789, poverty: 15.1,
+        is_tourist: true, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 32 σαλόνια (0.4% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Ιωάννινα", lat: 39.7, lng: 20.85,
+        population: 160773, salons_est: 114,
+        gdp_per_cap: 13789, poverty: 15.1,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "Ιωάννινα πόλη",
+        notes: "Poidata 7/2026: Ιωάννινα πόλη 70. Εκτίμηση 2026: 114 σαλόνια (1.5% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Καβάλα", lat: 40.95, lng: 24.4,
+        population: 116195, salons_est: 92,
+        gdp_per_cap: 13840, poverty: 23.1,
+        is_tourist: true, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 92 σαλόνια (1.2% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 62,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Καρδίτσα", lat: 39.35, lng: 21.9,
+        population: 104855, salons_est: 74,
+        gdp_per_cap: 14891, poverty: 20.7,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 74 σαλόνια (1.0% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Καστοριά", lat: 40.5, lng: 21.25,
+        population: 45929, salons_est: 28,
+        gdp_per_cap: 15543, poverty: 27.4,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 28 σαλόνια (0.4% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "low", intensity: 28,
+            distributors: ["Εξυπηρέτηση από Αθήνα/Θεσσαλονίκη", "Περιορισμένο τοπικό δίκτυο"],
+            brands: { dye: 32, shampoo: 30, treatment: 24 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Βασικές σειρές Wella, value brands"
+        }
+    },
+    {
+        name: "Κέρκυρα", lat: 39.6, lng: 19.85,
+        population: 99134, salons_est: 78,
+        gdp_per_cap: 19502, poverty: 21.1,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 78 σαλόνια (1.0% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Κεφαλληνία", lat: 38.2, lng: 20.55,
+        population: 36064, salons_est: 29,
+        gdp_per_cap: 19502, poverty: 21.1,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 29 σαλόνια (0.4% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Κιλκίς", lat: 41.0, lng: 22.85,
+        population: 70477, salons_est: 50,
+        gdp_per_cap: 16982, poverty: 25.4,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 50 σαλόνια (0.7% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "low", intensity: 38,
+            distributors: ["Εξυπηρέτηση από Αθήνα/Θεσσαλονίκη", "Περιορισμένο τοπικό δίκτυο"],
+            brands: { dye: 32, shampoo: 30, treatment: 24 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Βασικές σειρές Wella, value brands"
+        }
+    },
+    {
+        name: "Κοζάνη", lat: 40.3, lng: 21.8,
+        population: 137210, salons_est: 97,
+        gdp_per_cap: 15543, poverty: 27.4,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 97 σαλόνια (1.3% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Κορινθία", lat: 38.0, lng: 22.7,
+        population: 135027, salons_est: 107,
+        gdp_per_cap: 17841, poverty: 25.6,
+        is_tourist: true, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 107 σαλόνια (1.4% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 62,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Κυκλάδες", lat: 37.0, lng: 25.1,
+        population: 119549, salons_est: 95,
+        gdp_per_cap: 21610, poverty: 16.0,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 95 σαλόνια (1.3% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 62,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Λακωνία", lat: 36.7, lng: 22.55,
+        population: 87058, salons_est: 69,
+        gdp_per_cap: 17841, poverty: 25.6,
+        is_tourist: true, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 69 σαλόνια (0.9% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Λάρισα", lat: 39.65, lng: 22.45,
+        population: 268758, salons_est: 205,
+        gdp_per_cap: 14891, poverty: 20.7,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "Λάρισα πόλη",
+        notes: "Poidata 7/2026: Λάρισα πόλη 89. Εκτίμηση 2026: 205 σαλόνια (2.7% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 62,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Λασίθι", lat: 35.15, lng: 25.9,
+        population: 76888, salons_est: 61,
+        gdp_per_cap: 18345, poverty: 14.2,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 61 σαλόνια (0.8% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Λέσβος", lat: 39.2, lng: 26.3,
+        population: 84200, salons_est: 67,
+        gdp_per_cap: 13436, poverty: 30.0,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 67 σαλόνια (0.9% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Λευκάδα", lat: 38.7, lng: 20.65,
+        population: 21900, salons_est: 17,
+        gdp_per_cap: 19502, poverty: 21.1,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 17 σαλόνια (0.2% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Μαγνησία", lat: 39.35, lng: 22.95,
+        population: 172532, salons_est: 122,
+        gdp_per_cap: 14891, poverty: 20.7,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "Βόλος",
+        notes: "Poidata 7/2026: Βόλος 57. Εκτίμηση 2026: 122 σαλόνια (1.6% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Μεσσηνία", lat: 37.25, lng: 21.95,
+        population: 154263, salons_est: 122,
+        gdp_per_cap: 17841, poverty: 25.6,
+        is_tourist: true, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 122 σαλόνια (1.6% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 62,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Ξάνθη", lat: 41.15, lng: 24.85,
+        population: 103275, salons_est: 73,
+        gdp_per_cap: 13840, poverty: 23.1,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 73 σαλόνια (1.0% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Πέλλα", lat: 40.8, lng: 22.15,
+        population: 126749, salons_est: 90,
+        gdp_per_cap: 16982, poverty: 25.4,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 90 σαλόνια (1.2% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Πιερία", lat: 40.3, lng: 22.45,
+        population: 119384, salons_est: 94,
+        gdp_per_cap: 16982, poverty: 25.4,
+        is_tourist: true, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 94 σαλόνια (1.3% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 62,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Πρέβεζα", lat: 38.95, lng: 20.75,
+        population: 54700, salons_est: 43,
+        gdp_per_cap: 13789, poverty: 15.1,
+        is_tourist: true, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 43 σαλόνια (0.6% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Ρέθυμνο", lat: 35.3, lng: 24.5,
+        population: 84866, salons_est: 67,
+        gdp_per_cap: 18345, poverty: 14.2,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 67 σαλόνια (0.9% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Ροδόπη", lat: 41.1, lng: 25.45,
+        population: 104262, salons_est: 74,
+        gdp_per_cap: 13840, poverty: 23.1,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 74 σαλόνια (1.0% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Σάμος", lat: 37.7, lng: 26.85,
+        population: 32642, salons_est: 26,
+        gdp_per_cap: 13436, poverty: 30.0,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 26 σαλόνια (0.3% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Σέρρες", lat: 41.05, lng: 23.55,
+        population: 151423, salons_est: 107,
+        gdp_per_cap: 16982, poverty: 25.4,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 107 σαλόνια (1.4% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Τρίκαλα", lat: 39.6, lng: 21.7,
+        population: 122143, salons_est: 86,
+        gdp_per_cap: 14891, poverty: 20.7,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 86 σαλόνια (1.2% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Φθιώτιδα", lat: 38.9, lng: 22.55,
+        population: 148069, salons_est: 105,
+        gdp_per_cap: 18469, poverty: 20.6,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 105 σαλόνια (1.4% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Φλώρινα", lat: 40.8, lng: 21.4,
+        population: 44921, salons_est: 27,
+        gdp_per_cap: 15543, poverty: 27.4,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 27 σαλόνια (0.4% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "low", intensity: 28,
+            distributors: ["Εξυπηρέτηση από Αθήνα/Θεσσαλονίκη", "Περιορισμένο τοπικό δίκτυο"],
+            brands: { dye: 32, shampoo: 30, treatment: 24 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Βασικές σειρές Wella, value brands"
+        }
+    },
+    {
+        name: "Φωκίδα", lat: 38.5, lng: 22.35,
+        population: 36199, salons_est: 22,
+        gdp_per_cap: 18469, poverty: 20.6,
+        is_tourist: false, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 22 σαλόνια (0.3% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "low", intensity: 28,
+            distributors: ["Εξυπηρέτηση από Αθήνα/Θεσσαλονίκη", "Περιορισμένο τοπικό δίκτυο"],
+            brands: { dye: 32, shampoo: 30, treatment: 24 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Βασικές σειρές Wella, value brands"
+        }
+    },
+    {
+        name: "Χαλκιδική", lat: 40.4, lng: 23.5,
+        population: 104746, salons_est: 83,
+        gdp_per_cap: 16982, poverty: 25.4,
+        is_tourist: true, is_island: false, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 83 σαλόνια (1.1% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 62,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Χανιά", lat: 35.45, lng: 24.0,
+        population: 156585, salons_est: 124,
+        gdp_per_cap: 18345, poverty: 14.2,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "Χανιά πόλη",
+        notes: "Poidata 7/2026: Χανιά πόλη 58. Εκτίμηση 2026: 124 σαλόνια (1.7% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 62,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Χίος", lat: 38.4, lng: 26.05,
+        population: 50361, salons_est: 40,
+        gdp_per_cap: 13436, poverty: 30.0,
+        is_tourist: true, is_island: true, is_city: false,
+        cities: "—",
+        notes: "Εκτίμηση 2026: 40 σαλόνια (0.5% εθνικού). Κατανομή βάσει απογραφής 2021 με συντελεστή αστικοποίησης/τουρισμού.",
+        competition: { level: "med", intensity: 52,
+            distributors: ["Wella δίκτυο διανομής", "L'Oréal via χονδρική", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 60, shampoo: 58, treatment: 48 },
+            market_notes: "Εκτίμηση 2026 από Poidata 7/2026 (σύνολο 7474) με κατανομή απογραφής 2021.",
+            top_products: "Wella, L'Oréal, value brands"
+        }
+    },
+    {
+        name: "Αθήνα (πόλη)", lat: 37.9838, lng: 23.7275,
+        population: 637798, salons_est: 593,
+        gdp_per_cap: 33500, poverty: 11.5,
+        is_tourist: false, is_island: false, is_city: true,
+        cities: "Κέντρο, Γλυφάδα, Χαλάνδρι, Μαρούσι, Καλλιθέα, Περιστέρι",
+        notes: "Poidata 7/2026: 593 σαλόνια (7,9% εθνικού). ≈23.2% του νομού Αττικής. Δήμος Αθηναίων, απογραφή 2021: 637.798.",
+        competition: { level: "high", intensity: 98,
+            distributors: ["Wella Hellas (HQ)", "L'Oréal Professionnel", "Schwarzkopf / Goldwell", "Τοπικοί χονδρέμποροι"],
+            brands: { dye: 98, shampoo: 99, treatment: 95 },
+            market_notes: "Poidata 7/2026: Αθήνα 593 (7,9%). Κέντρο premium αγοράς, 8+ μεγάλοι διανομείς.",
+            top_products: "Wella Koleston, L'Oréal Majirel, Schwarzkopf Igora"
+        }
+    },
+    {
+        name: "Θεσσαλονίκη (πόλη)", lat: 40.6401, lng: 22.9445,
+        population: 319045, salons_est: 365,
+        gdp_per_cap: 18200, poverty: 22.0,
+        is_tourist: false, is_island: false, is_city: true,
+        cities: "Κέντρο, Σταυρούπολη, Εύοσμος, Καλαμαριά, Πυλαία",
+        notes: "Poidata 7/2026: 365 σαλόνια (4,9% εθνικού). ≈46.5% του νομού. Σωματείο 2022: ~2.000 μέλη· 2025: ~1/3 λουκέτο.",
+        competition: { level: "high", intensity: 85,
+            distributors: ["Vmondo (3 καταστήματα)", "Dermaistas B2B (HQ)", "Beauty Free (Αγ. Σοφίας)", "Wella δίκτυο"],
+            brands: { dye: 88, shampoo: 86, treatment: 78 },
+            market_notes: "Poidata 7/2026: Θεσσαλονίκη 365 (4,9%). Vmondo, Dermaistas B2B, Beauty Free.",
+            top_products: "Wella, L'Oréal, K-beauty (Dermaistas)"
+        }
+    }
+];
+
+// === ΑΓΟΡΑΣΤΙΚΗ ΔΥΝΑΜΗ — επίσημα στοιχεία ΕΛΣΤΑΤ / Eurostat ===
+// ΑΕΠ κ.κ. (€, τρέχουσες τιμές 2023): ΕΛΣΤΑΤ Περιφερειακοί Λογαριασμοί 2023 (προσωρινά, Πίνακας 2) — ήδη στο πεδίο gdp_per_cap.
+// PPS 2023 (μονάδες αγοραστικής δύναμης): Eurostat regional GDP per capita in PPS, έτος αναφοράς 2023 (ΕΕ-27 = 38.100).
+// Κίνδυνος φτώχειας (%): ΕΛΣΤΑΤ SILC 2023, έρευνα εισοδήματος & συνθηκών διαβίωσης — ήδη στο πεδίο poverty.
+const PPS_2023 = {
+    'Αττική': 36700, 'Νότιο Αιγαίο': 26600, 'Στερεά Ελλάδα': 23900,
+    'Ιόνια Νησιά': 23300, 'Πελοπόννησος': 22600, 'Κρήτη': 22500,
+    'Δυτική Μακεδονία': 21200, 'Κεντρική Μακεδονία': 20800, 'Θεσσαλία': 19700,
+    'Δυτική Ελλάδα': 18900, 'Ανατολική Μακεδονία-Θράκη': 17100, 'Ήπειρος': 17000,
+    'Βόρειο Αιγαίο': 16100
+};
+const EU27_PPS_2023 = 38100;
+const NOMOS_TO_PERIFEREIA = {
+    'Αττική': 'Αττική', 'Αθήνα (πόλη)': 'Αττική',
+    'Θεσσαλονίκης': 'Κεντρική Μακεδονία', 'Θεσσαλονίκη (πόλη)': 'Κεντρική Μακεδονία',
+    'Ημαθία': 'Κεντρική Μακεδονία', 'Κιλκίς': 'Κεντρική Μακεδονία', 'Πέλλα': 'Κεντρική Μακεδονία',
+    'Πιερία': 'Κεντρική Μακεδονία', 'Σέρρες': 'Κεντρική Μακεδονία', 'Χαλκιδική': 'Κεντρική Μακεδονία',
+    'Δράμα': 'Ανατολική Μακεδονία-Θράκη', 'Έβρος': 'Ανατολική Μακεδονία-Θράκη', 'Καβάλα': 'Ανατολική Μακεδονία-Θράκη',
+    'Ξάνθη': 'Ανατολική Μακεδονία-Θράκη', 'Ροδόπη': 'Ανατολική Μακεδονία-Θράκη',
+    'Γρεβενά': 'Δυτική Μακεδονία', 'Καστοριά': 'Δυτική Μακεδονία', 'Κοζάνη': 'Δυτική Μακεδονία', 'Φλώρινα': 'Δυτική Μακεδονία',
+    'Άρτα': 'Ήπειρος', 'Θεσπρωτία': 'Ήπειρος', 'Ιωάννινα': 'Ήπειρος', 'Πρέβεζα': 'Ήπειρος',
+    'Καρδίτσα': 'Θεσσαλία', 'Λάρισα': 'Θεσσαλία', 'Μαγνησία': 'Θεσσαλία', 'Τρίκαλα': 'Θεσσαλία',
+    'Ζάκυνθος': 'Ιόνια Νησιά', 'Κέρκυρα': 'Ιόνια Νησιά', 'Κεφαλληνία': 'Ιόνια Νησιά', 'Λευκάδα': 'Ιόνια Νησιά',
+    'Αιτωλοακαρνανία': 'Δυτική Ελλάδα', 'Αχαΐα': 'Δυτική Ελλάδα', 'Ηλεία': 'Δυτική Ελλάδα',
+    'Βοιωτία': 'Στερεά Ελλάδα', 'Εύβοια': 'Στερεά Ελλάδα', 'Ευρυτανία': 'Στερεά Ελλάδα',
+    'Φθιώτιδα': 'Στερεά Ελλάδα', 'Φωκίδα': 'Στερεά Ελλάδα',
+    'Αργολίδα': 'Πελοπόννησος', 'Αρκαδία': 'Πελοπόννησος', 'Κορινθία': 'Πελοπόννησος',
+    'Λακωνία': 'Πελοπόννησος', 'Μεσσηνία': 'Πελοπόννησος',
+    'Δωδεκάνησα': 'Νότιο Αιγαίο', 'Κυκλάδες': 'Νότιο Αιγαίο',
+    'Λέσβος': 'Βόρειο Αιγαίο', 'Σάμος': 'Βόρειο Αιγαίο', 'Χίος': 'Βόρειο Αιγαίο',
+    'Ηράκλειο': 'Κρήτη', 'Λασίθι': 'Κρήτη', 'Ρέθυμνο': 'Κρήτη', 'Χανιά': 'Κρήτη'
+};
+let NATIONAL_TOTAL = 7474; // Poidata 7/2026 (Google-verified). Οι 2 πόλεις είναι υποσύνολα νομών.
+function recomputeDerived() {
+    const nomoiOnly = regions.filter(r => !r.is_city);
+    NATIONAL_TOTAL = nomoiOnly.reduce((s, r) => s + r.salons_est, 0);
+    regions.forEach(r => {
+        r.pop_per_salon = Math.round(r.population / r.salons_est);
+        r.share_pct = +(r.salons_est / NATIONAL_TOTAL * 100).toFixed(1);
+        let oppScore = 0;
+        if (r.pop_per_salon > 1800) oppScore += 3;
+        else if (r.pop_per_salon > 1200) oppScore += 1;
+        if (r.gdp_per_cap > 18000) oppScore += 2;
+        else if (r.gdp_per_cap > 14000) oppScore += 1;
+        if (r.is_tourist) oppScore += 1;
+        if (r.poverty < 18) oppScore += 1;
+        if (r.is_city) oppScore += 1;
+        if (oppScore >= 4) r.opportunity = 'high';
+        else if (oppScore >= 2) r.opportunity = 'med';
+        else r.opportunity = 'low';
+    });
+    regions.forEach(r => {
+        const perif = NOMOS_TO_PERIFEREIA[r.name] || '—';
+        const pps = PPS_2023[perif] || null;
+        r.perifereia = perif;
+        r.pps = pps;
+        r.pps_eu_pct = pps ? +(pps / EU27_PPS_2023 * 100).toFixed(1) : null;
+        if (r.pps_eu_pct == null) r.purch = 'mid';
+        else if (r.pps_eu_pct >= 70) r.purch = 'high';
+        else if (r.pps_eu_pct >= 55) r.purch = 'mid';
+        else r.purch = 'low';
+    });
+}
+recomputeDerived();
+
+// === ΣΤΟΙΧΕΙΑ 5ΕΤΙΑΣ — ενσωματωμένες σειρές από αξιόπιστες πηγές (εθνικό επίπεδο) ===
+// ΠΡΟΣΟΧΗ: οι σειρές αυτές είναι εθνικές / NUTS2. Σε επίπεδο νομού δεν δημοσιεύεται ετήσια σειρά
+// για ΑΕΠ κ.κ., PPS και φτώχεια — οι τιμές νομών παραμένουν οι πιο πρόσφατες διαθέσιμες (2021/2023).
+// Πηγές: ΕΛΣΤΑΤ Περιφερειακοί Λογαριασμοί (ΑΕΠ κ.κ. €, δελτία 2019–2023) • Eurostat nama_10_pc / tec00114 (PPS)
+// • ΕΛΣΤΑΤ EU-SILC 2019–2024 (κίνδυνος φτώχειας ή κοινωνικού αποκλεισμού AROPE, %) • Απογραφή 2021.
+const FIVE_YEAR = {
+    gdp_pc_eur: { 2019: 17101, 2020: 15427, 2021: 17347, 2022: 19647, 2023: 21301, src: 'ΕΛΣΤΑΤ Περιφερειακοί Λογαριασμοί (σημ.: το 2022 αναθεωρήθηκε σε νεότερες εκδόσεις· τιμές όπως δημοσιεύτηκαν στα αντίστοιχα δελτία)' },
+    pps_eur: { 2019: 20765, 2020: 18866, 2021: 21246, 2022: 24026, 2023: 26262, src: 'Eurostat nama_10_pc (Ελλάδα, PPS κ.κ.)' },
+    arope_pct: { 2019: 30.0, 2020: 27.4, 2021: 28.3, 2022: 26.3, 2023: 26.1, 2024: 26.9, src: 'ΕΛΣΤΑΤ EU-SILC 2019–2024 (AROPE %)' },
+    salon_note: 'Poidata 7/2026: μοναδικό στιγμιότυπο (7.474). Δεν υπάρχει αξιόπιστη δημόσια 5ετής σειρά αριθμού κομμωτηρίων ανά νομό.'
+};
+function labelIconHtml(r) {
+    const labelSize = r.is_city ? '12px' : '10px';
+    const labelColor = r.is_city ? '#0369a1' : '#0f172a';
+    return `<div style="color:${labelColor};font-size:${labelSize};font-weight:700;text-shadow:0 1px 3px rgba(255,255,255,0.95),0 0 8px rgba(255,255,255,0.9);white-space:nowrap;transform:translate(-50%,${r.is_city ? -30 : 16}px);text-align:center;letter-spacing:0.3px;line-height:1.35;">${r.is_city ? '🏙️ ' : ''}${r.name}<br><span class="map-label-num">${r.salons_est.toLocaleString('el-GR')} • ${r.share_pct.toLocaleString('el-GR')}%</span></div>`;
+}
+function buildPopupContent(r) {
+    const cityBadge = r.is_city ? '<span class="city-badge">ΠΟΛΗ</span>' : '';
+    return `
+        <div class="popup-title">${r.name} ${cityBadge}</div>
+        <div class="popup-row"><span class="label">Κομμωτήρια 2026:</span><span class="val">~${r.salons_est.toLocaleString('el-GR')}</span></div>
+        <div class="popup-row"><span class="label">Μερίδιο εθνικού συνόλου:</span><span class="val">${r.share_pct.toLocaleString('el-GR')}%</span></div>
+        <div class="popup-comp-bar" style="height:8px;"><div class="popup-comp-fill" style="width:${Math.min(100, r.share_pct * 4)}%;background:#0ea5e9;"></div></div>
+        <div class="popup-row"><span class="label">Πληθυσμός (2021):</span><span class="val">${r.population.toLocaleString('el-GR')}</span></div>
+        <div class="popup-row popup-highlight"><span class="label">Κάτοικοι / Κατάστημα:</span><span class="val">${r.pop_per_salon.toLocaleString('el-GR')}</span></div>
+        <div class="popup-row"><span class="label">Περιφέρεια:</span><span class="val">${r.perifereia}</span></div>
+        <div class="popup-row"><span class="label">ΑΕΠ κ.κ. (ΕΛΣΤΑΤ 2023):</span><span class="val">${r.gdp_per_cap.toLocaleString('el-GR')} €</span></div>
+        <div class="popup-row"><span class="label">Αγοραστική δύναμη (PPS 2023):</span><span class="val">${r.pps ? r.pps.toLocaleString('el-GR') + ' • ' + String(r.pps_eu_pct).replace('.', ',') + '% ΕΕ' : '—'}</span></div>
+        <div class="popup-comp-bar" style="height:8px;"><div class="popup-comp-fill" style="width:${r.pps_eu_pct ? Math.min(100, r.pps_eu_pct) : 0}%;background:${r.purch === 'high' ? '#15803d' : r.purch === 'mid' ? '#b45309' : '#dc2626'};"></div></div>
+        <div class="popup-row"><span class="label">Κίνδυνος φτώχειας (SILC 2023):</span><span class="val">${String(r.poverty).replace('.', ',')}%</span></div>
+        <div class="popup-purch ${r.purch}">${r.purch === 'high' ? '💰 ΑΓΟΡΑΣΤΙΚΗ ΔΥΝΑΜΗ: ΥΨΗΛΗ' : r.purch === 'mid' ? '💰 ΑΓΟΡΑΣΤΙΚΗ ΔΥΝΑΜΗ: ΜΕΣΑΙΑ' : '💰 ΑΓΟΡΑΣΤΙΚΗ ΔΥΝΑΜΗ: ΧΑΜΗΛΗ'}</div>
+        <div style="margin-top:6px;font-size:9px;color:#64748b;">${r.notes}</div>
+        <div style="margin-top:4px;font-size:8px;color:#64748b;">Πηγές: Poidata 7/2026 • ELSTAT Απογραφή 2021 • ELSTAT Περιφερειακοί Λογαριασμοί 2023 • ELSTAT SILC 2023 • Eurostat PPS 2023 (ΕΕ-27=38.100) • ΚΟΚΚΚΕ 7/2023 • ELSTAT SBR 2023 (NACE 96.02)</div>
+    `;
+}
+function renderPerifAnalysis() {
+    const el = document.getElementById('perifAnalysis');
+    if (!el) return;
+    const agg = {};
+    regions.filter(r => !r.is_city).forEach(r => {
+        const p = r.perifereia || '—';
+        if (!agg[p]) agg[p] = { name: p, salons: 0, pop: 0 };
+        agg[p].salons += r.salons_est;
+        agg[p].pop += r.population;
+    });
+    const rows = Object.values(agg).map(t => ({
+        name: t.name, salons: t.salons, pop: t.pop,
+        kk: Math.round(t.pop / t.salons),
+        share: +(t.salons / NATIONAL_TOTAL * 100).toFixed(1)
+    })).sort((a, b) => b.salons - a.salons);
+    let html = '<table><thead><tr><th>Περιφέρεια</th><th>Σαλόνια</th><th>%</th><th>Κ/Κ</th></tr></thead><tbody>';
+    rows.forEach(t => {
+        html += `<tr><td>${t.name}</td><td><strong>${t.salons.toLocaleString('el-GR')}</strong></td><td>${String(t.share).replace('.', ',')}%</td><td><strong>${t.kk.toLocaleString('el-GR')}</strong></td></tr>`;
+    });
+    html += '</tbody></table>';
+    html += `<div class="change" style="margin-top:8px;"><strong>5ετία (εθνικό):</strong> ΑΕΠ κ.κ. 2019→2023: 17.101→21.301 € • PPS 2019→2023: 20.765→26.262 • AROPE 2019→2024: 30,0%→26,9%. Πηγές: ΕΛΣΤΑΤ Περιφερειακοί Λογαριασμοί • Eurostat nama_10_pc • ΕΛΣΤΑΤ SILC. ${FIVE_YEAR.salon_note}</div>`;
+    el.innerHTML = html;
+}
+
+
+const map = L.map('map', { center: [39.0, 22.5], zoom: 6, zoomControl: false, attributionControl: true });
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// --- Basemaps with automatic fallback (light theme default) ---
+// Default: CARTO Light / OSM Standard (matches light UI, allows file://, CORS-enabled).
+const osmStandard = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    tileSize: 256,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+});
+const cartoDark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_3is8_1_210fa6376c67b373b2c513f5', {
+    maxZoom: 20,
+    subdomains: 'abcd',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+});
+const cartoLight = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_3is8_1_210fa6376c67b373b2c513f5', {
+    maxZoom: 20,
+    subdomains: 'abcd',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+});
+const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics'
+});
+const opentopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17,
+    subdomains: 'abc',
+    attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, <a href="http://viewfinderpanoramas.org">SRTM</a> | style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'
+});
+
+cartoLight.addTo(map); // default — light theme match
+L.control.layers(
+    {
+        'Light (CARTO) — default': cartoLight,
+        'OpenStreetMap Standard': osmStandard,
+        'Dark (CARTO)': cartoDark,
+        'Satellite (Esri)': esriSat,
+        'Topo (OpenTopoMap)': opentopo
+    },
+    null,
+    { position: 'topright' }
+).addTo(map);
+
+// Auto-fallback: if the active tile layer throws repeated errors (403/blocked/offline),
+// cycle to the next provider automatically instead of showing a grey grid.
+const _fallbackChain = [cartoLight, osmStandard, cartoDark, esriSat, opentopo];
+let _tileErrCount = 0, _fallbackIdx = 0, _fallbackLock = false;
+function _armFallback(layer) {
+    layer.on('tileerror', () => {
+        _tileErrCount++;
+        if (_tileErrCount < 6 || _fallbackLock) return; // tolerate a few stray 404s
+        _fallbackLock = true;
+        _fallbackIdx = (_fallbackChain.indexOf(layer) + 1) % _fallbackChain.length;
+        const next = _fallbackChain[_fallbackIdx];
+        console.warn('[basemap] tile errors on active layer, falling back to:', next._url);
+        try { if (map.hasLayer(layer)) map.removeLayer(layer); } catch (e) {}
+        if (!map.hasLayer(next)) next.addTo(map);
+        _armFallbackOnce(next);
+        _tileErrCount = 0;
+        setTimeout(() => { _fallbackLock = false; }, 5000);
+    });
+}
+function _armFallbackOnce(layer) {
+    // re-arm counter reset when tiles start loading fine again
+    layer.on('tileload', () => { _tileErrCount = Math.max(0, _tileErrCount - 1); });
+}
+_fallbackChain.forEach(_armFallback);
+_armFallbackOnce(cartoLight);
+
+const markers = [];
+const labelMarkers = [];
+
+regions.forEach(r => {
+    // Μέγεθος ανάλογα με τα κομμωτήρια, ενιαίο χρώμα
+    const size = Math.max(14, Math.min(52, 10 + Math.sqrt(r.salons_est) * 0.9));
+
+    L.circleMarker([r.lat, r.lng], {
+        radius: size / 2 + 4, fillColor: '#0ea5e9', color: 'transparent', weight: 0, fillOpacity: 0.22
+    }).addTo(map);
+
+    const marker = L.circleMarker([r.lat, r.lng], {
+        radius: size / 2, fillColor: '#0ea5e9', color: '#fff',
+        weight: r.is_city ? 3 : 2, opacity: 0.95, fillOpacity: 0.85
+    }).addTo(map);
+
+    const popupContent = buildPopupContent(r);
+
+    marker.bindPopup(popupContent, { maxWidth: Math.min(380, (window.innerWidth || 400) - 40) });
+    marker.regionData = r;
+    markers.push(marker);
+
+    labelMarkers.push(L.marker([r.lat, r.lng], {
+        icon: L.divIcon({
+            className: '',
+            html: labelIconHtml(r),
+            iconSize: [0, 0]
+        })
+    }).addTo(map));
+});
+
+// Ετικέτες: απόκρυψη σε κινητά όταν το zoom είναι μικρό (αποφυγή συνωστισμού)
+function updateLabels() {
+    const hide = window.innerWidth < 640 && map.getZoom() < 7;
+    labelMarkers.forEach(m => {
+        const on = map.hasLayer(m);
+        if (hide && on) map.removeLayer(m);
+        else if (!hide && !on) m.addTo(map);
+    });
+}
+map.on('zoomend', updateLabels);
+map.on('resize', updateLabels);
+updateLabels();
+
+function buildRegionTable() {
+const tbody = document.getElementById('regionTable');
+if (!tbody) return;
+tbody.innerHTML = '';
+const sorted = [...regions].sort((a, b) => b.salons_est - a.salons_est);
+sorted.forEach((r, i) => {
+    const oppClass = r.opportunity === 'high' ? 'opp-high' : r.opportunity === 'med' ? 'opp-med' : 'opp-low';
+    const oppText = r.opportunity === 'high' ? 'HIGH' : r.opportunity === 'med' ? 'MED' : 'LOW';
+    const compClass = r.competition.level === 'high' ? 'comp-high' : r.competition.level === 'med' ? 'comp-med' : 'comp-low';
+    const compText = r.competition.level === 'high' ? 'HIGH' : r.competition.level === 'med' ? 'MED' : 'LOW';
+    const rowClass = r.is_city ? 'city-row' : (r.opportunity === 'high' ? 'highlight' : '');
+    tbody.innerHTML += `
+        <tr class="${rowClass}" onmouseenter="highlightRegion('${r.name}')" onmouseleave="unhighlightRegion()">
+            <td>${i + 1}</td>
+            <td>${r.is_city ? '🏙️ ' : ''}${r.name}</td>
+            <td><strong>${r.salons_est.toLocaleString('el-GR')}</strong></td>
+            <td>${r.share_pct.toLocaleString('el-GR')}%</td>
+            <td>${r.pop_per_salon.toLocaleString('el-GR')}</td>
+            <td class="${oppClass}">${oppText}</td>
+            <td class="${compClass}">${compText}</td>
+
+        </tr>
+    `;
+});
+}
+buildRegionTable();
+renderPerifAnalysis();
+
+function highlightRegion(name) {
+    markers.forEach(m => { if (m.regionData.name === name) m.setStyle({ weight: 3, fillOpacity: 0.95 }); });
+}
+function unhighlightRegion() {
+    markers.forEach(m => m.setStyle({ weight: m.regionData.is_city ? 3 : 2, fillOpacity: 0.75 }));
+}
+
+// === DRAG FUNCTIONALITY ===
+let dragState = { el: null, startX: 0, startY: 0, origLeft: 0, origTop: 0 };
+
+function startDrag(e, panelId) {
+    e.preventDefault();
+    const el = document.getElementById(panelId);
+    dragState = {
+        el,
+        startX: e.clientX,
+        startY: e.clientY,
+        origLeft: el.offsetLeft,
+        origTop: el.offsetTop
+    };
+    document.addEventListener('pointermove', onDrag);
+    document.addEventListener('pointerup', stopDrag);
+}
+
+function onDrag(e) {
+    if (!dragState.el) return;
+    const dx = e.clientX - dragState.startX;
+    const dy = e.clientY - dragState.startY;
+    dragState.el.style.left = (dragState.origLeft + dx) + 'px';
+    dragState.el.style.top = (dragState.origTop + dy) + 'px';
+    dragState.el.style.right = 'auto';
+    dragState.el.style.bottom = 'auto';
+}
+
+function stopDrag() {
+    dragState.el = null;
+    document.removeEventListener('pointermove', onDrag);
+    document.removeEventListener('pointerup', stopDrag);
+}
+
+// === FULL TABLE (overlay + print + excel) ===
+let _ftBuilt = false;
+function toggleFullTable() {
+    const ov = document.getElementById('fullTableOverlay');
+    const open = ov.style.display === 'none';
+    if (open && !_ftBuilt) { buildFullTable(); _ftBuilt = true; }
+    ov.style.display = open ? 'flex' : 'none';
+}
+function buildFullTable() {
+    const rows = [...regions].sort((a, b) => b.salons_est - a.salons_est);
+    let html = '';
+    rows.forEach((r, i) => {
+        html += '<tr' + (r.is_city ? ' class="ft-city"' : '') + '><td>' + (i + 1) + '</td><td>' + (r.is_city ? '🏙️ ' : '') + r.name + '</td><td>' + r.salons_est.toLocaleString('el-GR') + '</td><td>' + String(r.share_pct).replace('.', ',') + '%</td><td>' + r.population.toLocaleString('el-GR') + '</td><td>' + r.pop_per_salon.toLocaleString('el-GR') + '</td><td>' + r.gdp_per_cap.toLocaleString('el-GR') + ' €</td><td>' + (r.pps ? r.pps.toLocaleString('el-GR') + ' • ' + String(r.pps_eu_pct).replace('.', ',') + '%' : '—') + '</td><td>' + String(r.poverty).replace('.', ',') + '%</td></tr>';
+    });
+    document.getElementById('fullTableBody').innerHTML = html;
+    const nomoi = regions.filter(r => !r.is_city);
+    const tS = nomoi.reduce((s, r) => s + r.salons_est, 0);
+    const tP = nomoi.reduce((s, r) => s + r.population, 0);
+    document.getElementById('fullTableFoot').innerHTML = '<tr><td></td><td>ΣΥΝΟΛΟ / Μ.Ο. (νομοί)</td><td>' + tS.toLocaleString('el-GR') + '</td><td>100%</td><td>' + tP.toLocaleString('el-GR') + '</td><td>' + Math.round(tP / tS).toLocaleString('el-GR') + '</td><td>21.301 €</td><td>26.400 • 69,3%</td><td>19,5%</td></tr>';
+}
+function printFullTable() { window.print(); }
+function exportExcel() {
+    const rows = [...regions].sort((a, b) => b.salons_est - a.salons_est);
+    let csv = '﻿#;Νομός/Πόλη;Κομμωτήρια 2026;% Εθνικού;Πληθυσμός 2021;Κάτοικοι/Σαλόνι;Περιφέρεια;ΑΕΠ κκ 2023 (€, ΕΛΣΤΑΤ);PPS 2023 (Eurostat);PPS % ΕΕ-27;Κίνδυνος φτώχειας % (SILC 2023);Αγοραστική δύναμη\n';
+    rows.forEach((r, i) => {
+        csv += (i + 1) + ';' + r.name + ';' + r.salons_est + ';' + String(r.share_pct).replace('.', ',') + ';' + r.population + ';' + r.pop_per_salon + ';' + r.perifereia + ';' + r.gdp_per_cap + ';' + (r.pps || '') + ';' + String(r.pps_eu_pct).replace('.', ',') + ';' + String(r.poverty).replace('.', ',') + ';' + (r.purch === 'high' ? 'ΥΨΗΛΗ' : r.purch === 'mid' ? 'ΜΕΣΑΙΑ' : 'ΧΑΜΗΛΗ') + '\n';
+    });
+    const nomoi = regions.filter(r => !r.is_city);
+    const tS = nomoi.reduce((s, r) => s + r.salons_est, 0);
+    const tP = nomoi.reduce((s, r) => s + r.population, 0);
+    csv += ';ΣΥΝΟΛΟ / Μ.Ο. (νομοί);' + tS + ';100;' + tP + ';' + Math.round(tP / tS) + ';Ελλάδα;21301;26400;69,3;19,5;\n';
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'kommotiria_nomi_2026.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        const ov = document.getElementById('fullTableOverlay');
+        if (ov && ov.style.display !== 'none') ov.style.display = 'none';
+    }
+});
+
+// === COLLAPSE / EXPAND PANELS ===
+function toggleCollapse(e, panelId, btn) {
+    e.stopPropagation();
+    const el = document.getElementById(panelId);
+    el.classList.toggle('collapsed');
+    const collapsed = el.classList.contains('collapsed');
+    btn.textContent = collapsed ? '+' : '−';
+    btn.title = collapsed ? 'Μεγιστοποίηση' : 'Ελαχιστοποίηση';
+}
+</script>
+
+</body>
+</html>
