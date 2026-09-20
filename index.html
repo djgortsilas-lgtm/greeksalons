@@ -5,19 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Κομμωτήρια Ελλάδας - Χάρτης Ευκαιριών & Ανταγωνισμού</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f1f5f9; color: #0f172a; }
+        body { font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f1f5f9; color: #0f172a; }
+        .header h1, .panel-header h3, #tableBtn, .metric-btn, .popup-title, .legend-title, .ft-header h2 { font-family: 'Montserrat', 'Roboto', 'Segoe UI', sans-serif; }
         #map { height: 100vh; width: 100%; z-index: 1; }
         
         .header {
             position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
-            background: linear-gradient(135deg, #ffffff 0%, #e0f2fe 100%);
-            padding: 14px 28px; display: flex; align-items: center; justify-content: space-between;
-            border-bottom: 2px solid #0ea5e9; box-shadow: 0 4px 20px rgba(14,165,233,0.15);
+            background: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(224,242,254,0.88) 100%);
+            backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+            padding: 12px 28px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+            border-bottom: 1px solid rgba(14,165,233,0.35); box-shadow: 0 8px 32px rgba(2,132,199,0.14);
+            animation: fadeDown 0.6s ease both;
         }
-        .header h1 { font-size: 19px; color: #0369a1; font-weight: 700; letter-spacing: 0.5px; }
+        .header h1 {
+            font-size: 19px; font-weight: 800; letter-spacing: 0.5px;
+            background: linear-gradient(90deg, #075985 0%, #0284c7 55%, #0ea5e9 100%);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
         .header .subtitle { font-size: 11px; color: #64748b; margin-top: 3px; }
         
         .draggable-panel {
@@ -68,8 +78,9 @@
         @media (max-width: 640px) {
             .map-hint { left: 8px; bottom: 12px; font-size: 10px; padding: 6px 10px; }
         }
-        #tableBtn { background: linear-gradient(135deg,#0284c7,#0ea5e9); color:#fff; border:1px solid #0284c7; padding:8px 18px; border-radius:10px; cursor:pointer; font-size:13px; font-weight:800; letter-spacing:0.5px; box-shadow:0 2px 10px rgba(2,132,199,0.35); white-space:nowrap; }
-        #tableBtn:hover { filter: brightness(1.1); }
+        #tableBtn { background: linear-gradient(135deg,#075985,#0284c7 55%,#0ea5e9); color:#fff; border:none; padding:9px 22px; border-radius:999px; cursor:pointer; font-size:13px; font-weight:700; letter-spacing:0.5px; box-shadow:0 4px 16px rgba(2,132,199,0.4); white-space:nowrap; transition: transform 0.2s, box-shadow 0.2s, filter 0.2s; }
+        #tableBtn:hover { transform: translateY(-1px); box-shadow:0 6px 22px rgba(2,132,199,0.5); filter: brightness(1.08); }
+        #tableBtn:active { transform: translateY(0); }
         #perifAnalysis table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 8px; }
         #perifAnalysis th { background: #f1f5f9; color: #475569; padding: 6px 4px; font-size: 9px; text-transform: uppercase; }
         #perifAnalysis td { padding: 5px 4px; border-bottom: 1px solid #e2e8f0; text-align: right; }
@@ -161,10 +172,12 @@
         .filter-btn.active { background: linear-gradient(135deg, #0284c7, #0ea5e9); color: #fff; border-color: #0284c7; box-shadow: 0 2px 10px rgba(2,132,199,0.35); }
 
         .leaflet-popup-content-wrapper {
-            background: #ffffff !important; border: 2px solid #0ea5e9 !important; border-radius: 14px !important; color: #0f172a !important; box-shadow: 0 8px 32px rgba(15,23,42,0.18) !important;
+            background: rgba(255,255,255,0.98) !important; border: 1px solid rgba(14,165,233,0.45) !important; border-radius: 16px !important; color: #0f172a !important; box-shadow: 0 12px 40px rgba(2,132,199,0.22) !important;
+            backdrop-filter: blur(8px);
         }
-        .leaflet-popup-tip { background: #ffffff !important; border: 1px solid #e2e8f0 !important; }
-        .popup-title { font-size: 16px; font-weight: 800; color: #0369a1; margin-bottom: 8px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; }
+        .leaflet-popup-content { margin: 14px 16px !important; line-height: 1.45 !important; }
+        .leaflet-popup-tip { background: rgba(255,255,255,0.98) !important; border: 1px solid rgba(14,165,233,0.35) !important; }
+        .popup-title { font-size: 15px; font-weight: 800; color: #075985; margin-bottom: 8px; border-bottom: 2px solid transparent; border-image: linear-gradient(90deg, #0ea5e9, transparent) 1; padding-bottom: 8px; }
         .popup-title .city-badge { display: inline-block; background: rgba(14,165,233,0.12); border: 1px solid #0ea5e9; border-radius: 6px; padding: 2px 8px; font-size: 9px; color: #0284c7; margin-left: 6px; vertical-align: middle; }
         .popup-row { display: flex; justify-content: space-between; margin: 4px 0; font-size: 11px; }
         .popup-row .label { color: #64748b; }
@@ -189,6 +202,89 @@
         .purch-high { color: #15803d; font-weight: 700; }
         .purch-mid { color: #b45309; font-weight: 700; }
         .purch-low { color: #dc2626; font-weight: 700; }
+
+        /* === Premium UI: switcher, legend, labels, controls, animations === */
+        .draggable-panel {
+            border: 1px solid rgba(14,165,233,0.28) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 12px 40px rgba(2,132,199,0.16) !important;
+            animation: fadeUp 0.5s ease both;
+        }
+        .panel-header h3 { font-weight: 800 !important; }
+        .collapse-btn { transition: transform 0.2s, background 0.2s; }
+        .collapse-btn:hover { transform: scale(1.1); }
+
+        .metric-switch {
+            position: fixed; top: 76px; left: 50%; transform: translateX(-50%); z-index: 1000;
+            display: flex; gap: 4px; padding: 4px;
+            background: rgba(255,255,255,0.9); border: 1px solid rgba(14,165,233,0.35);
+            border-radius: 999px; box-shadow: 0 8px 28px rgba(2,132,199,0.18);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            animation: fadeDown 0.6s ease both;
+        }
+        .metric-btn {
+            background: transparent; border: none; color: #475569; padding: 7px 16px; border-radius: 999px;
+            cursor: pointer; font-size: 11.5px; font-weight: 700; letter-spacing: 0.3px;
+            transition: all 0.25s; white-space: nowrap;
+        }
+        .metric-btn:hover { color: #0284c7; background: rgba(14,165,233,0.1); }
+        .metric-btn.active { background: linear-gradient(135deg, #075985, #0284c7 60%, #0ea5e9); color: #fff; box-shadow: 0 3px 12px rgba(2,132,199,0.4); }
+        .metric-btn { position: relative; }
+        .metric-tip {
+            display: none; position: absolute; top: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+            width: 255px; background: rgba(255,255,255,0.98); border: 1px solid rgba(14,165,233,0.45);
+            border-radius: 12px; padding: 10px 13px; font-family: 'Roboto', 'Segoe UI', sans-serif;
+            font-size: 10.5px; font-weight: 400; color: #334155; text-align: left; line-height: 1.6;
+            letter-spacing: 0; white-space: normal; text-transform: none;
+            box-shadow: 0 12px 36px rgba(2,132,199,0.28); z-index: 1001; pointer-events: none;
+        }
+        .metric-tip strong { color: #075985; }
+        .metric-btn:hover .metric-tip, .metric-btn:focus-visible .metric-tip { display: block; }
+
+        .legend-card {
+            position: fixed; left: 24px; bottom: 70px; z-index: 1000; pointer-events: none;
+            background: rgba(255,255,255,0.92); border: 1px solid rgba(14,165,233,0.35);
+            border-radius: 14px; padding: 10px 14px; min-width: 150px;
+            box-shadow: 0 8px 28px rgba(2,132,199,0.16);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            animation: fadeUp 0.6s ease both;
+        }
+        .legend-card .legend-title { font-size: 10px; font-weight: 800; color: #075985; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 6px; }
+        .legend-card .legend-item { font-size: 10.5px; font-weight: 500; margin: 4px 0; }
+        .legend-sq { display: inline-block; width: 13px; height: 13px; border-radius: 4px; margin-right: 8px; vertical-align: -1px; border: 1px solid rgba(15,23,42,0.18); box-shadow: 0 1px 4px rgba(15,23,42,0.2); }
+        .legend-card .legend-hint { font-size: 9px; color: #94a3b8; margin-top: 6px; max-width: 190px; line-height: 1.4; }
+
+        .map-label-pill {
+            display: inline-block; background: rgba(255,255,255,0.88);
+            border: 1px solid rgba(2,132,199,0.4); border-radius: 8px; padding: 2px 8px;
+            box-shadow: 0 2px 8px rgba(15,23,42,0.14);
+            backdrop-filter: blur(2px);
+        }
+
+        .leaflet-bar a {
+            color: #075985 !important; border: none !important;
+            box-shadow: 0 2px 10px rgba(2,132,199,0.18) !important;
+            transition: background 0.2s;
+        }
+        .leaflet-bar a:hover { background: rgba(14,165,233,0.12) !important; }
+        .leaflet-bar { border: 1px solid rgba(14,165,233,0.35) !important; border-radius: 10px !important; overflow: hidden; box-shadow: 0 4px 16px rgba(2,132,199,0.18) !important; }
+        .leaflet-control-layers {
+            border: 1px solid rgba(14,165,233,0.35) !important; border-radius: 12px !important;
+            box-shadow: 0 4px 16px rgba(2,132,199,0.18) !important; font-family: 'Roboto', sans-serif !important;
+        }
+
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeDown { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+        .header { animation-name: headerDown; }
+        @keyframes headerDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 640px) {
+            .metric-switch { top: 70px; max-width: calc(100vw - 16px); overflow-x: auto; }
+            .metric-btn { padding: 6px 10px; font-size: 10px; }
+            .metric-tip { position: fixed; top: 114px; left: 8px; right: 8px; width: auto; transform: none; }
+            .legend-card { left: 8px; bottom: 58px; padding: 8px 10px; min-width: 0; }
+            .legend-card .legend-hint { display: none; }
+        }
 
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
@@ -260,6 +356,18 @@
     </div>
 </div>
 
+<div class="metric-switch" id="metricSwitch">
+    <button class="metric-btn active" data-metric="opportunity" onclick="setMetric('opportunity')">🎯 Ευκαιρία
+        <span class="metric-tip"><strong>Πώς υπολογίζεται (0–8 πόντοι):</strong><br>• Κάτοικοι/σαλόνι &gt;1.800 → +3 · &gt;1.200 → +1<br>• ΑΕΠ κ.κ. 2023 &gt;18.000€ → +2 · &gt;14.000€ → +1<br>• Τουριστικός νομός → +1<br>• Φτώχεια (SILC 2023) &lt;18% → +1<br>• Αθήνα/Θεσσαλονίκη (πόλη) → +1<br><strong>≥4 Υψηλή • 2–3 Μέτρια • 0–1 Χαμηλή</strong></span>
+    </button>
+    <button class="metric-btn" data-metric="salons" onclick="setMetric('salons')">💈 Σαλόνια
+        <span class="metric-tip">Χρωματική κλίμακα με βάση τον αριθμό κομμωτηρίων 2026 (Poidata 7/2026). Όσο πιο σκούρο μπλε, τόσα περισσότερα σαλόνια.</span>
+    </button>
+    <button class="metric-btn" data-metric="purch" onclick="setMetric('purch')">💰 Αγορ. δύναμη
+        <span class="metric-tip">Βάσει PPS 2023 (Eurostat) ως % του μ.ό. ΕΕ-27:<br><strong>≥70% Υψηλή • 55–70% Μεσαία • &lt;55% Χαμηλή</strong></span>
+    </button>
+</div>
+<div class="legend-card" id="mapLegend"></div>
 <div class="map-hint" id="mapHint">⏳ Φόρτωση ορίων νομών…</div>
 <div id="map"></div>
 
@@ -1088,7 +1196,7 @@ const FIVE_YEAR = {
 function labelIconHtml(r) {
     const labelSize = r.is_city ? '12px' : '10px';
     const labelColor = r.is_city ? '#0369a1' : '#0f172a';
-    return `<div style="color:${labelColor};font-size:${labelSize};font-weight:700;text-shadow:0 1px 3px rgba(255,255,255,0.95),0 0 8px rgba(255,255,255,0.9);white-space:nowrap;transform:translate(-50%,${r.is_city ? -30 : 16}px);text-align:center;letter-spacing:0.3px;line-height:1.35;">${r.is_city ? '🏙️ ' : ''}${r.name}<br><span class="map-label-num">${r.salons_est.toLocaleString('el-GR')} • ${r.share_pct.toLocaleString('el-GR')}%</span></div>`;
+    return `<div style="color:${labelColor};font-size:${labelSize};font-weight:700;text-shadow:0 1px 3px rgba(255,255,255,0.95),0 0 8px rgba(255,255,255,0.9);white-space:nowrap;transform:translate(-50%,${r.is_city ? -30 : 16}px);text-align:center;letter-spacing:0.3px;line-height:1.35;"><span class="map-label-pill">${r.is_city ? '🏙️ ' : ''}${r.name}<br><span class="map-label-num">${r.salons_est.toLocaleString('el-GR')} • ${r.share_pct.toLocaleString('el-GR')}%</span></span></div>`;
 }
 function buildPopupContent(r) {
     const cityBadge = r.is_city ? '<span class="city-badge">ΠΟΛΗ</span>' : '';
@@ -1212,10 +1320,39 @@ let selectedNomos = null;
 const regionByName = {};
 regions.forEach(r => { regionByName[r.name] = r; });
 
-// --- Στυλ πολυγώνων νομών ---
-const NOMOS_STYLE = { fillColor: '#0ea5e9', fillOpacity: 0.28, color: '#0284c7', weight: 1.5, opacity: 0.9 };
-const NOMOS_HOVER = { fillColor: '#0ea5e9', fillOpacity: 0.55, color: '#0369a1', weight: 3, opacity: 1 };
-const NOMOS_SELECTED = { fillColor: '#0284c7', fillOpacity: 0.6, color: '#075985', weight: 3, opacity: 1 };
+// --- Χρωματικός χάρτης (choropleth): χρωματισμός νομών ανά δείκτη ---
+let currentMetric = 'opportunity'; // 'opportunity' | 'salons' | 'purch'
+
+const METRICS = {
+    opportunity: { label: 'Ευκαιρία', hint: '🟢 υψηλή • 🟠 μέτρια • 🔴 χαμηλή ευκαιρία' },
+    salons: { label: 'Σαλόνια 2026', hint: 'Όσο πιο σκούρο μπλε, τόσα περισσότερα κομμωτήρια' },
+    purch: { label: 'Αγοραστική δύναμη', hint: '🟢 υψηλή • 🟠 μεσαία • 🔴 χαμηλή' }
+};
+
+function metricFill(r) {
+    if (currentMetric === 'salons') {
+        const n = r.salons_est;
+        if (n > 500) return '#075985';
+        if (n > 200) return '#0284c7';
+        if (n > 100) return '#0ea5e9';
+        if (n > 50) return '#7dd3fc';
+        return '#bae6fd';
+    }
+    const v = currentMetric === 'purch' ? r.purch : r.opportunity;
+    if (v === 'high') return '#16a34a';
+    if (v === 'med' || v === 'mid') return '#f59e0b';
+    return '#ef4444';
+}
+
+function nomosBaseStyle(r) {
+    return { fillColor: metricFill(r), fillOpacity: 0.45, color: '#ffffff', weight: 1.4, opacity: 1 };
+}
+function nomosHoverStyle(r) {
+    return { fillColor: metricFill(r), fillOpacity: 0.7, color: '#0f172a', weight: 2.5, opacity: 1 };
+}
+function nomosSelectedStyle(r) {
+    return { fillColor: metricFill(r), fillOpacity: 0.75, color: '#0f172a', weight: 3, opacity: 1 };
+}
 
 // Popup: περιορισμένο ύψος με scroll + autopan που σέβεται το fixed header,
 // ώστε να μη βγαίνει εκτός οθόνης και να μη κρύβεται η περιγραφή
@@ -1229,17 +1366,28 @@ function popupOpts() {
     };
 }
 
-function applyNomosStyle(name, style) {
-    (nomosLayersByName[name] || []).forEach(l => l.setStyle(style));
+function styleForNomos(name, mode) {
+    const r = regionByName[name];
+    if (!r) return {};
+    if (mode === 'hover') return nomosHoverStyle(r);
+    if (mode === 'selected') return nomosSelectedStyle(r);
+    return nomosBaseStyle(r);
+}
+function applyNomosStyle(name, mode) {
+    const s = styleForNomos(name, mode);
+    (nomosLayersByName[name] || []).forEach(l => l.setStyle(s));
 }
 function resetNomosStyle(name) {
-    applyNomosStyle(name, name === selectedNomos ? NOMOS_SELECTED : NOMOS_STYLE);
+    applyNomosStyle(name, name === selectedNomos ? 'selected' : 'base');
 }
 function selectNomos(name) {
     const prev = selectedNomos;
     selectedNomos = name;
     if (prev && prev !== name) resetNomosStyle(prev);
-    if (name) applyNomosStyle(name, NOMOS_SELECTED);
+    if (name) applyNomosStyle(name, 'selected');
+}
+function recolorNomoi() {
+    Object.keys(nomosLayersByName).forEach(n => resetNomosStyle(n));
 }
 map.on('popupclose', () => selectNomos(null));
 
@@ -1300,7 +1448,10 @@ const GEO_TO_REGION = {
 
 function addNomoiLayer(geojson) {
     L.geoJSON(geojson, {
-        style: NOMOS_STYLE,
+        style: f => {
+            const n = f && f.properties && GEO_TO_REGION[f.properties.name];
+            return n && regionByName[n] ? nomosBaseStyle(regionByName[n]) : {};
+        },
         filter: f => {
             const n = f && f.properties && GEO_TO_REGION[f.properties.name];
             return !!n && !!regionByName[n];
@@ -1324,7 +1475,7 @@ function addNomoiLayer(geojson) {
             });
 
             layer.on('mouseover', () => {
-                if (regionName !== selectedNomos) applyNomosStyle(regionName, NOMOS_HOVER);
+                if (regionName !== selectedNomos) applyNomosStyle(regionName, 'hover');
                 map.getContainer().style.cursor = 'pointer';
             });
             layer.on('mouseout', () => {
@@ -1425,12 +1576,37 @@ renderPerifAnalysis();
 
 function highlightRegion(name) {
     markers.forEach(m => { if (m.regionData.name === name) m.setStyle({ weight: 4, fillOpacity: 1 }); });
-    if (nomosLayersByName[name]) applyNomosStyle(name, NOMOS_HOVER);
+    if (nomosLayersByName[name]) applyNomosStyle(name, 'hover');
 }
 function unhighlightRegion() {
     markers.forEach(m => m.setStyle({ weight: 3, fillOpacity: 0.85 }));
     Object.keys(nomosLayersByName).forEach(n => resetNomosStyle(n));
 }
+
+// === ΔΕΙΚΤΗΣ ΧΑΡΤΗ (switcher + υπόμνημα) ===
+function setMetric(m) {
+    if (!METRICS[m] || m === currentMetric) return;
+    currentMetric = m;
+    document.querySelectorAll('.metric-btn').forEach(b => b.classList.toggle('active', b.dataset.metric === m));
+    recolorNomoi();
+    renderLegend();
+}
+function renderLegend() {
+    const el = document.getElementById('mapLegend');
+    if (!el) return;
+    let items = '';
+    if (currentMetric === 'salons') {
+        const bins = [['500+', '#075985'], ['201–500', '#0284c7'], ['101–200', '#0ea5e9'], ['51–100', '#7dd3fc'], ['≤ 50', '#bae6fd']];
+        items = bins.map(b => `<div class="legend-item"><span class="legend-sq" style="background:${b[1]}"></span>${b[0]}</div>`).join('');
+    } else {
+        const lvl = currentMetric === 'purch'
+            ? [['Υψηλή', '#16a34a'], ['Μεσαία', '#f59e0b'], ['Χαμηλή', '#ef4444']]
+            : [['Υψηλή', '#16a34a'], ['Μέτρια', '#f59e0b'], ['Χαμηλή', '#ef4444']];
+        items = lvl.map(x => `<div class="legend-item"><span class="legend-sq" style="background:${x[1]}"></span>${x[0]}</div>`).join('');
+    }
+    el.innerHTML = `<div class="legend-title">${METRICS[currentMetric].label}</div>${items}<div class="legend-hint">${METRICS[currentMetric].hint}</div>`;
+}
+renderLegend();
 
 // === DRAG FUNCTIONALITY ===
 let dragState = { el: null, startX: 0, startY: 0, origLeft: 0, origTop: 0 };
